@@ -1,95 +1,156 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+import { useRef, useCallback, useEffect, useState } from "react";
+import Sidebar from "@/components/Sidebar";
+import Topbar from "@/components/Topbar";
+import EmptyState from "@/components/EmptyState";
+import UserMessage from "@/components/UserMessage";
+import BotMessage from "@/components/BotMessage";
+import Composer from "@/components/Composer";
+import SourcePanel from "@/components/SourcePanel";
+import { useChat } from "@/hooks/useChat";
+import { useTheme } from "@/hooks/useTheme";
+import type { Source } from "@/types";
+import type { A2UIActionPayload } from "@/lib/a2ui-data";
 
 export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const chat = useChat();
+  const { theme, toggle: toggleTheme } = useTheme();
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+  const [sbOpen, setSbOpen] = useState(false);
+  const [sbCollapsed, setSbCollapsed] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const [panel, setPanel] = useState<{ open: boolean; sources: Source[] | null; focusId: number | null }>({
+    open: false, sources: null, focusId: null,
+  });
+  const [activeCite, setActiveCite] = useState<number | null>(null);
+
+  const threadRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = useCallback(() => {
+    const el = threadRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight });
+  }, []);
+
+  // wire scrollCb so the streaming engine can scroll during token emission
+  useEffect(() => {
+    chat.scrollCb.current = () => {
+      if (chat.autoStick.current) scrollToBottom();
+    };
+  }, [chat.scrollCb, chat.autoStick, scrollToBottom]);
+
+  // auto-scroll when messages change
+  useEffect(() => {
+    if (chat.autoStick.current) scrollToBottom();
+  }, [chat.messages, scrollToBottom, chat.autoStick]);
+
+  const onThreadScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    setScrolled(el.scrollTop > 8);
+    const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+    chat.autoStick.current = dist < 120;
+  }, [chat.autoStick]);
+
+  const openSources = useCallback((sources: Source[], focusId: number) => {
+    setPanel({ open: true, sources, focusId });
+    setActiveCite(focusId);
+  }, []);
+
+  const onCite = useCallback((n: number) => {
+    const lastBot = [...chat.messages].reverse().find((m) => m.role === "bot" && m.sources);
+    if (lastBot?.sources) openSources(lastBot.sources, n);
+  }, [chat.messages, openSources]);
+
+  const onOpenSources = useCallback((focusId: number) => {
+    const lastBot = [...chat.messages].reverse().find((m) => m.role === "bot" && m.sources);
+    if (lastBot?.sources) openSources(lastBot.sources, focusId);
+  }, [chat.messages, openSources]);
+
+  const closePanel = useCallback(() => {
+    setPanel((p) => ({ ...p, open: false }));
+    setActiveCite(null);
+  }, []);
+
+  const handleNewChat = () => {
+    chat.newChat();
+    setSbOpen(false);
+    closePanel();
+  };
+
+  const handleSelect = (id: string) => {
+    chat.selectSession(id);
+    setSbOpen(false);
+    closePanel();
+  };
+
+  const handleSend = (text: string, files: { name: string; size: string; icon: string }[]) => {
+    chat.send(text, files);
+    setSbOpen(false);
+  };
+
+  const appClass = [
+    "app",
+    sbOpen ? "sb-open" : "",
+    sbCollapsed ? "sb-collapsed" : "",
+  ].filter(Boolean).join(" ");
+
+  return (
+    <div className={appClass}>
+      <div className="sb-scrim" onClick={() => setSbOpen(false)} />
+
+      <Sidebar
+        sessions={chat.sessions}
+        activeId={chat.activeId}
+        onSelect={handleSelect}
+        onNew={handleNewChat}
+        onDelete={chat.deleteSession}
+      />
+
+      <div className="main">
+        <Topbar
+          scrolled={scrolled}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          onNewChat={handleNewChat}
+          onToggleSidebar={() => setSbCollapsed((v) => !v)}
+          onOpenMobileSidebar={() => setSbOpen(true)}
+        />
+
+        <div className="thread" ref={threadRef} onScroll={onThreadScroll}>
+          {chat.messages.length === 0 ? (
+            <EmptyState onPick={(t) => handleSend(t, [])} />
+          ) : (
+            <div className="thread-inner">
+              {chat.messages.map((m) =>
+                m.role === "user" ? (
+                  <UserMessage key={m.id} msg={m} />
+                ) : (
+                  <BotMessage
+                    key={m.id}
+                    msg={m}
+                    activeCite={activeCite}
+                    onCite={onCite}
+                    onOpenSources={onOpenSources}
+                    onRegenerate={chat.regenerate}
+                    onFeedback={chat.feedback}
+                    onA2UIData={chat.onA2UIData}
+                    onA2UIAction={(p) => chat.onA2UIAction(p as A2UIActionPayload)}
+                  />
+                )
+              )}
+            </div>
+          )}
         </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        <Composer onSend={handleSend} busy={chat.busy} onStop={chat.stop} />
+      </div>
+
+      <SourcePanel
+        open={panel.open}
+        sources={panel.sources}
+        focusId={panel.focusId}
+        onClose={closePanel}
+      />
     </div>
   );
 }
