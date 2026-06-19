@@ -24,7 +24,7 @@ export default function EmptyState({ onPick }: { onPick: (text: string) => void 
       <div className="empty-hi">
         안녕하세요, <span className="grad">엔지니어님</span>
       </div>
-      <div className="empty-sub">오늘은 어떤 서비스를 살펴볼까요? MSA 운영·개발에 대해 무엇이든 물어보세요.</div>
+      <div className="empty-sub">오늘은 어떤 서비스를 살펴볼까요? 세이플린 운영·개발에 대해 무엇이든 물어보세요.</div>
 
       <div className="suggest-grid">
         {SUGGESTIONS.map((s, i) => (

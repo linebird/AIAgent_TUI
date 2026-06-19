@@ -52,8 +52,8 @@ export default function Sidebar({ sessions, activeId, onSelect, onNew, onDelete 
           <div className="brand">
             <div className="brand-mark" />
             <div>
-              <div className="brand-name">SAFETY<b>SAAS</b></div>
-              <div className="brand-sub">MSA Agent · 사내 운영 도우미</div>
+              <div className="brand-name">Saferyn<b>Chat</b></div>
+              <div className="brand-sub">AI Agent · 사내 운영 도우미</div>
             </div>
           </div>
           <button className="new-chat" onClick={onNew}>

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SAFETYSAAS Agent",
-  description: "MSA AI 챗봇 — 안전보건 및 MSA 운영·개발 도우미",
+  title: "Saferyn AI Agent",
+  description: "Saferyn AI 챗봇 — 세이플린 운영·개발 도우미",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

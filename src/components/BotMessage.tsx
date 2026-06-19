@@ -50,7 +50,7 @@ export default function BotMessage({ msg, activeCite, onCite, onOpenSources, onR
     <div className="msg msg-bot">
       <div className={"bot-ava" + (msg.streaming ? " thinking" : "")} />
       <div className="bot-body">
-        <div className="bot-name">SAFETYSAAS Agent</div>
+        <div className="bot-name">Saferyn AI Agent</div>
 
         {msg.phase === "status" && <StatusLine text={msg.statusText ?? "처리 중…"} />}
 

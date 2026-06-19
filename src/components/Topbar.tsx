@@ -26,7 +26,7 @@ export default function Topbar({ scrolled, theme, onToggleTheme, onNewChat, onTo
       </button>
       <div className="model-chip">
         <span className="dot" />
-        Safety-LLM
+        Saferyn-LLM
         <span className="mc-sub">v2 · RAG</span>
       </div>
       <div className="spacer" />

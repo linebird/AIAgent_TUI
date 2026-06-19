@@ -113,7 +113,7 @@ export default function Composer({ onSend, busy, onStop }: Props) {
             ref={taRef}
             rows={1}
             value={text}
-            placeholder={recording ? "음성을 듣고 있어요…" : "MSA 운영·개발에 대해 무엇이든 물어보세요. (Shift+Enter 줄바꿈)"}
+            placeholder={recording ? "음성을 듣고 있어요…" : "세이플린 운영·개발에 대해 무엇이든 물어보세요. (Shift+Enter 줄바꿈)"}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={onKeyDown}
             onFocus={() => setFocus(true)}
@@ -153,7 +153,7 @@ export default function Composer({ onSend, busy, onStop }: Props) {
           </div>
         ) : (
           <div className="composer-foot">
-            SAFETYSAAS Agent는 사내 문서·코드를 근거로 답변합니다. 중요한 결정은 원문을 확인하세요.
+            Saferyn AI Agent는 사내 문서·코드를 근거로 답변합니다. 중요한 결정은 원문을 확인하세요.
           </div>
         )}
       </div>
