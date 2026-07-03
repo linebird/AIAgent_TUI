@@ -7,6 +7,7 @@ import { a2ApplyEnvelope, a2SetImmutable } from "@/lib/a2ui";
 import { a2uiActionReply, type A2UIActionPayload } from "@/lib/a2ui-data";
 
 const LS_KEY = "safetysaas_agent_v1";
+const CHAT_API_URL = "http://223.130.159.179:8000/chat/stream";
 
 function loadState(): Store {
   if (typeof window === "undefined") return { sessions: [], activeId: null };
@@ -77,7 +78,7 @@ export function useChat() {
       patchMsg(botId, { phase: "status", statusText: "요청을 처리하고 있어요…" });
       console.log("activeId:", activeId, "botId:", botId, "userText:", userText);
 
-      const res = await fetch("http://223.130.159.179:8000/chat/stream", {
+      const res = await fetch(CHAT_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
