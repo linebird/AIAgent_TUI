@@ -69,18 +69,19 @@ export function useChat() {
   }, [setMessages]);
 
   // ---- Core agent runner (supports both text-only and A2UI answers) ----
-  const runAgent = useCallback(async (botId: string, userText: string) => {
+  const runAgent = useCallback(async (sessionId: string, botId: string, userText: string) => {
     const myRun = ++RUN;
     const cancelled = () => myRun !== RUN;
 
     try {
       patchMsg(botId, { phase: "status", statusText: "요청을 처리하고 있어요…" });
+      console.log("activeId:", activeId, "botId:", botId, "userText:", userText);
 
-      const res = await fetch("http://localhost:8000/chat/stream", {
+      const res = await fetch("http://223.130.159.179:8000/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          session_id: activeId ?? botId,
+          session_id: sessionId,
           message: userText,
         }),
       });
@@ -186,6 +187,7 @@ export function useChat() {
     setStore((st) => ({ ...st }));
   }, [patchMsg]);
 
+
   const send = useCallback((text: string, files: { name: string; size: string; icon: string }[]) => {
     autoStick.current = true;
     const userMsg: Message = { id: uid(), role: "user", text, files };
@@ -195,10 +197,16 @@ export function useChat() {
       phase: "status", statusText: "요청을 받았어요", cot: [], cotRevealed: 0,
     };
 
+    let sessionId = activeId;
+    if (!sessionId) {
+        sessionId = uid();
+    }
+
     setStore((st) => {
       let { sessions, activeId } = st;
       if (!activeId || !sessions.find((s) => s.id === activeId)) {
-        const ns: Session = { id: uid(), title: genTitle(text), createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
+        // const ns: Session = { id: uid(), title: genTitle(text), createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
+        const ns: Session = { id: sessionId, title: genTitle(text), createdAt: Date.now(), updatedAt: Date.now(), messages: [] };
         sessions = [ns, ...sessions];
         activeId = ns.id;
       }
@@ -208,11 +216,12 @@ export function useChat() {
         const title = s.messages.length === 0 ? genTitle(text) : s.title;
         return { ...s, title, messages: msgs, updatedAt: Date.now() };
       });
-      return { sessions, activeId };
+
+      return { sessions, activeId: sessionId };
     });
 
-    setTimeout(() => runAgent(botId, text), 0);
-  }, [runAgent]);
+    setTimeout(() => runAgent(sessionId, botId, text), 0);
+  }, [activeId, runAgent]);
 
   // ---- A2UI callbacks ----
 
