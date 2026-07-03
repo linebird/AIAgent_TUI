@@ -7,7 +7,7 @@ import { a2ApplyEnvelope, a2SetImmutable } from "@/lib/a2ui";
 import { a2uiActionReply, type A2UIActionPayload } from "@/lib/a2ui-data";
 
 const LS_KEY = "safetysaas_agent_v1";
-const CHAT_API_URL = "http://223.130.159.179:8000/chat/stream";
+const CHAT_API_URL = "http://localhost:8000/chat/stream"; // 클라우드 서버에서는 서버의 IP 주소를 사용해야 합니다. (localhost는 안됨. 223.130.159.179) 
 
 function loadState(): Store {
   if (typeof window === "undefined") return { sessions: [], activeId: null };
