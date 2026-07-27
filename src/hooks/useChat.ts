@@ -3,11 +3,76 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { Store, Message, Session, A2UISurfaceState } from "@/types";
 import { uid, genTitle, sleep } from "@/lib/utils";
 // import { pickAnswer } from "@/lib/data";
-import { a2ApplyEnvelope, a2SetImmutable } from "@/lib/a2ui";
+import { a2ApplyEnvelope, a2JsonToEnvelope, a2SetImmutable } from "@/lib/a2ui";
 import { a2uiActionReply, type A2UIActionPayload } from "@/lib/a2ui-data";
 
 const LS_KEY = "safetysaas_agent_v1";
 const CHAT_API_URL = "http://localhost:8000/chat/stream"; // 클라우드 서버에서는 서버의 IP 주소를 사용해야 합니다. (localhost는 안됨. 223.130.159.179) 
+
+function parseSseFrames(buffer: string): { frames: Array<{ event: string; data: unknown }>; remainder: string } {
+  const parts = buffer.split("\n\n");
+  const remainder = parts.pop() ?? "";
+  const frames: Array<{ event: string; data: unknown }> = [];
+
+  for (const block of parts) {
+    const lines = block.split("\n");
+    let event = "message";
+    const dataLines: string[] = [];
+
+    for (const rawLine of lines) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith(":")) continue;
+      if (line.startsWith("event:")) {
+        event = line.slice(6).trim() || "message";
+      } else if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trim());
+      }
+    }
+
+    if (!dataLines.length) continue;
+
+    const raw = dataLines.join("\n").trim();
+    let data: unknown = raw;
+    if (raw) {
+      try { data = JSON.parse(raw); } catch {}
+    }
+
+    frames.push({ event, data });
+  }
+
+  return { frames, remainder };
+}
+
+function parseJsonText(raw: string): unknown | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const jsonText = fenced ? fenced[1].trim() : trimmed;
+
+  try {
+    return JSON.parse(jsonText);
+  } catch {
+    return null;
+  }
+}
+
+function extractTextPayload(payload: unknown): string | null {
+  if (typeof payload === "string") return payload;
+  if (!payload || typeof payload !== "object") return null;
+
+  const obj = payload as Record<string, unknown>;
+  for (const key of ["text", "content", "delta", "answer"]) {
+    if (typeof obj[key] === "string") return obj[key] as string;
+  }
+
+  for (const key of ["data", "message"]) {
+    const nested = extractTextPayload(obj[key]);
+    if (nested !== null) return nested;
+  }
+
+  return null;
+}
 
 function loadState(): Store {
   if (typeof window === "undefined") return { sessions: [], activeId: null };
@@ -76,7 +141,6 @@ export function useChat() {
 
     try {
       patchMsg(botId, { phase: "status", statusText: "요청을 처리하고 있어요…" });
-      console.log("activeId:", activeId, "botId:", botId, "userText:", userText);
 
       const res = await fetch(CHAT_API_URL, {
         method: "POST",
@@ -102,6 +166,58 @@ export function useChat() {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let acc = "";
+      let sseBuffer = "";
+
+      const applyIncomingPayload = (payload: unknown) => {
+        if (!payload || typeof payload !== "object") return false;
+
+        const obj = payload as Record<string, unknown>;
+        const isEnvelope = !!(obj.createSurface || obj.updateComponents || obj.updateDataModel || obj.deleteSurface);
+
+        if (isEnvelope) {
+          patchMsg(botId, (m) => {
+            const current = m.a2uiState ?? null;
+            const next = a2ApplyEnvelope(current, payload as Record<string, unknown>);
+            return { ...m, phase: "a2ui", a2uiState: next };
+          });
+          return true;
+        }
+
+        const jsonEnvelope = a2JsonToEnvelope(payload);
+        if (jsonEnvelope) {
+          patchMsg(botId, (m) => {
+            let current = m.a2uiState ?? null;
+            for (const env of jsonEnvelope) {
+              current = a2ApplyEnvelope(current, env);
+            }
+            return { ...m, phase: "a2ui", a2uiState: current };
+          });
+          return true;
+        }
+
+        if (obj.event === "a2ui" && obj.data && typeof obj.data === "object") {
+          return applyIncomingPayload(obj.data);
+        }
+
+        if (obj.type === "a2ui" && obj.data && typeof obj.data === "object") {
+          return applyIncomingPayload(obj.data);
+        }
+
+        if (obj.data && typeof obj.data === "object") {
+          return applyIncomingPayload(obj.data);
+        }
+
+        return false;
+      };
+
+      const applyJsonTextAsA2UI = (raw: string) => {
+        const parsed = parseJsonText(raw);
+        if (!parsed) return false;
+        if (!applyIncomingPayload(parsed)) return false;
+        acc = "";
+        patchMsg(botId, { text: "" });
+        return true;
+      };
 
       while (true) {
         if (cancelled()) {
@@ -113,18 +229,94 @@ export function useChat() {
         const { done, value } = await reader.read();
         if (done) break;
 
-        acc += decoder.decode(value, { stream: true });
-        patchMsg(botId, { text: acc });
-        scrollCb.current?.();
+        const chunk = decoder.decode(value, { stream: true });
+        sseBuffer += chunk;
+        const { frames, remainder } = parseSseFrames(sseBuffer);
+        sseBuffer = remainder;
+
+        let textDelta = "";
+        for (const frame of frames) {
+          const { event, data } = frame;
+          const lowered = event.toLowerCase();
+
+          if (lowered === "a2ui" || lowered === "ui") {
+            applyIncomingPayload(data);
+            continue;
+          }
+
+          if (lowered === "done" || lowered === "end") {
+            continue;
+          }
+
+          const extractedText = extractTextPayload(data);
+          if (extractedText !== null) {
+            textDelta += extractedText;
+          } else if (data && typeof data === "object") {
+            if (applyIncomingPayload(data)) {
+              continue;
+            }
+            textDelta += JSON.stringify(data);
+          }
+        }
+
+        if (textDelta) {
+          acc += textDelta;
+          patchMsg(botId, { text: acc });
+          scrollCb.current?.();
+        }
       }
 
       const tail = decoder.decode();
       if (tail) {
-        acc += tail;
-        patchMsg(botId, { text: acc });
+        sseBuffer += tail;
+      }
+
+      if (sseBuffer.trim()) {
+        const { frames } = parseSseFrames(sseBuffer + "\n\n");
+        let textDelta = "";
+        for (const frame of frames) {
+          const { event, data } = frame;
+          const lowered = event.toLowerCase();
+          if (lowered === "a2ui" || lowered === "ui") {
+            applyIncomingPayload(data);
+            continue;
+          }
+          if (lowered === "done" || lowered === "end") continue;
+          const extractedText = extractTextPayload(data);
+          if (extractedText !== null) {
+            textDelta += extractedText;
+          } else if (data && typeof data === "object") {
+            if (applyIncomingPayload(data)) continue;
+            textDelta += JSON.stringify(data);
+          }
+        }
+        if (textDelta) {
+          acc += textDelta;
+          patchMsg(botId, { text: acc });
+        }
+
+        if (!frames.length) {
+          const parsed = parseJsonText(sseBuffer);
+          const parsedText = extractTextPayload(parsed);
+
+          if (parsed && applyIncomingPayload(parsed)) {
+            acc = "";
+            patchMsg(botId, { text: "" });
+          } else if (parsedText !== null) {
+            acc += parsedText;
+            patchMsg(botId, { text: acc });
+          } else {
+            acc += sseBuffer;
+            patchMsg(botId, { text: acc });
+          }
+        }
       }
 
       if (cancelled()) return;
+
+      if (acc.trim()) {
+        applyJsonTextAsA2UI(acc);
+      }
 
       patchMsg(botId, {
         phase: "done",
@@ -270,11 +462,11 @@ export function useChat() {
 
   const regenerate = useCallback((botMsgId: string) => {
     const idx = messages.findIndex((m) => m.id === botMsgId);
-    if (idx < 1) return;
+    if (idx < 1 || !activeId) return;
     const userText = messages[idx - 1].text;
     patchMsg(botMsgId, { text: "", streaming: true, phase: "status", statusText: "다시 생각하고 있어요", cot: [], cotRevealed: 0, sources: undefined, feedback: null, a2uiState: null });
-    setTimeout(() => runAgent(botMsgId, userText), 0);
-  }, [messages, patchMsg, runAgent]);
+    setTimeout(() => runAgent(activeId, botMsgId, userText), 0);
+  }, [activeId, messages, patchMsg, runAgent]);
 
   const feedback = useCallback((id: string, kind: "up" | "down") => {
     patchMsg(id, (m) => ({ feedback: m.feedback === kind ? null : kind }));

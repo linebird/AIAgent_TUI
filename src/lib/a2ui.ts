@@ -8,6 +8,359 @@ import type { A2UISurfaceState, A2UIComponent } from "@/types";
 export const A2UI_CATALOG_BASIC =
   "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function extractJsonItems(payload: Record<string, unknown>): {
+  items: Record<string, unknown>[];
+  summary: Record<string, unknown>;
+  shape: "approval" | "accident" | "activityScore" | "generic";
+} | null {
+  const inferShape = (items: Record<string, unknown>[]) => {
+    if (items.some((item) => "bplcNm" in item && "totScore" in item && "totGrade" in item)) return "activityScore";
+    if (items.some((item) => "approvalId" in item)) return "approval";
+    return "generic";
+  };
+  const data = payload.data;
+
+  if (Array.isArray(data)) {
+    const items = data.filter((item): item is Record<string, unknown> => isRecord(item));
+    if (!items.length) return null;
+
+    return {
+      items,
+      summary: {},
+      shape: inferShape(items),
+    };
+  }
+
+  if (!isRecord(data)) return null;
+
+  if (Array.isArray(data.acdntInfoDtls)) {
+    const items = data.acdntInfoDtls.filter((item): item is Record<string, unknown> => isRecord(item));
+    if (!items.length) return null;
+
+    return {
+      items,
+      summary: data,
+      shape: "accident",
+    };
+  }
+
+  const listEntry = Object.entries(data).find(([, value]) => Array.isArray(value));
+  if (!listEntry) return null;
+
+  const listValue = listEntry[1] as unknown[];
+  const items = listValue.filter((item): item is Record<string, unknown> => isRecord(item));
+  if (!items.length) return null;
+
+  return {
+    items,
+    summary: data,
+    shape: inferShape(items),
+  };
+}
+
+function looksLikeTenantInfo(value: Record<string, unknown>): boolean {
+  const keys = Object.keys(value).map((key) => key.toLowerCase());
+  const hasTenantId = keys.includes("tenantid") || keys.includes("tenant_id");
+  const hasTenantName = keys.includes("tenantname") || keys.includes("tenant_name") || keys.includes("tenantnm") || keys.includes("tenant_nm");
+  const hasSafetyTenantShape = keys.includes("id") && keys.includes("nm") && (
+    keys.includes("prodtype") ||
+    keys.includes("ramatrix") ||
+    keys.includes("industryse")
+  );
+
+  if ((hasTenantId || hasTenantName) || hasSafetyTenantShape) return true;
+
+  return keys.some((key) => (
+    key === "tenantid" ||
+    key === "tenant_id" ||
+    key === "tenantname" ||
+    key === "tenant_name" ||
+    key === "tenantnm" ||
+    key === "tenant_nm"
+  ));
+}
+
+function pickTenantInfo(payload: Record<string, unknown>): Record<string, unknown> | null {
+  const data = isRecord(payload.data) ? payload.data : null;
+  const result = isRecord(payload.result) ? payload.result : null;
+  const candidates = [
+    data?.tenant,
+    data?.tenantInfo,
+    result?.tenant,
+    result?.tenantInfo,
+    payload.tenant,
+    payload.tenantInfo,
+    payload.result,
+    payload.data,
+    payload,
+  ];
+
+  for (const candidate of candidates) {
+    if (!isRecord(candidate) || Array.isArray(candidate)) continue;
+    if (looksLikeTenantInfo(candidate)) return candidate;
+  }
+
+  return null;
+}
+
+function pickTenantRoot(payload: Record<string, unknown>): Record<string, unknown> {
+  if (isRecord(payload.data)) return payload.data;
+  if (isRecord(payload.result)) return payload.result;
+  return payload;
+}
+
+function humanizeTenantKey(key: string): string {
+  const labels: Record<string, string> = {
+    tenantId: "테넌트 ID",
+    tenant_id: "테넌트 ID",
+    tenantName: "테넌트명",
+    tenant_name: "테넌트명",
+    tenantNm: "테넌트명",
+    tenant_nm: "테넌트명",
+    companyName: "회사명",
+    company_name: "회사명",
+    bplcId: "사업장 ID",
+    bplcNm: "사업장",
+    status: "상태",
+    statusNm: "상태",
+    createdAt: "생성일시",
+    created_at: "생성일시",
+    updatedAt: "수정일시",
+    updated_at: "수정일시",
+  };
+  if (labels[key]) return labels[key];
+  return key
+    .replace(/_/g, " ")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function displayTenantValue(value: unknown): string {
+  if (value == null || value === "") return "-";
+  if (typeof value === "object") {
+    try { return JSON.stringify(value); } catch { return String(value); }
+  }
+  return String(value);
+}
+
+function pushTenantField(fields: Array<{ key: string; label: string; value: string }>, key: string, label: string, value: unknown) {
+  const display = displayTenantValue(value);
+  if (display === "-") return;
+  fields.push({ key, label, value: display });
+}
+
+function buildTenantInfoEnvelope(payload: Record<string, unknown>): Array<Record<string, unknown>> | null {
+  const tenant = pickTenantInfo(payload);
+  if (!tenant) return null;
+
+  const root = pickTenantRoot(payload);
+  const service = isRecord(root.service) ? root.service : null;
+  const emp = isRecord(root.emp) ? root.emp : null;
+  const roles = isRecord(root.roles) ? root.roles : null;
+  const authorities = Array.isArray(root.authorities) ? root.authorities : [];
+  const activeBplcs = Array.isArray(root.activeBplcs)
+    ? root.activeBplcs.filter((item): item is Record<string, unknown> => isRecord(item))
+    : [];
+  const activeBplcNames = activeBplcs.map((bplc) => displayTenantValue(bplc.nm)).filter((value) => value !== "-");
+  const authorityNames = authorities
+    .map((item) => isRecord(item) ? displayTenantValue(item.authority) : displayTenantValue(item))
+    .filter((value) => value !== "-");
+  const roleNames = roles ? Object.values(roles).map(displayTenantValue).filter((value) => value !== "-") : [];
+  const tenantName = displayTenantValue(
+    tenant.tenantName ?? tenant.tenant_name ?? tenant.tenantNm ?? tenant.tenant_nm ?? tenant.nm ?? tenant.companyName ?? tenant.company_name
+  );
+  const tenantId = displayTenantValue(tenant.tenantId ?? tenant.tenant_id ?? tenant.id);
+  const message = typeof payload.message === "string" ? payload.message : "테넌트 정보 조회 결과";
+  const fields: Array<{ key: string; label: string; value: string }> = [];
+
+  pushTenantField(fields, "tenant-id", "테넌트 ID", tenantId);
+  pushTenantField(fields, "tenant-name", "테넌트명", tenantName);
+  pushTenantField(fields, "service-name", "서비스", service?.nm);
+  pushTenantField(fields, "service-id", "서비스 ID", service?.id);
+  pushTenantField(fields, "employee-name", "사용자", emp?.nm);
+  pushTenantField(fields, "employee-email", "이메일", emp?.email ?? emp?.empId);
+  pushTenantField(fields, "tenant-role", "테넌트 역할", emp?.tenantRole);
+  pushTenantField(fields, "employee-status", "사용자 상태", emp?.status);
+  pushTenantField(fields, "product-type", "상품 유형", tenant.prodType);
+  pushTenantField(fields, "ra-matrix", "RA 매트릭스", tenant.raMatrix);
+  pushTenantField(fields, "prior-ra-factor", "사전 RA 기준", tenant.priorRaFactor);
+  pushTenantField(fields, "industry", "산업 구분", tenant.industrySe);
+  pushTenantField(fields, "authorities", "권한", authorityNames.join(", "));
+  pushTenantField(fields, "roles", "사업장 역할", Array.from(new Set(roleNames)).join(", "));
+  pushTenantField(fields, "active-bplcs", "활성 사업장", activeBplcNames.length ? `${activeBplcNames.length}개 · ${activeBplcNames.join(", ")}` : "");
+
+  if (!fields.length) {
+    Object.entries(tenant)
+      .filter(([, value]) => value !== undefined)
+      .forEach(([key, value]) => {
+        fields.push({
+          key,
+          label: humanizeTenantKey(key),
+          value: displayTenantValue(value),
+        });
+      });
+  }
+
+  return [
+    {
+      createSurface: {
+        surfaceId: "tenant-info-card",
+        catalogId: A2UI_CATALOG_BASIC,
+        theme: { primaryColor: "#0E7C66", agentDisplayName: "Tenant Bot" },
+        sendDataModel: true,
+      },
+    },
+    {
+      updateComponents: {
+        components: [
+          { id: "root", component: "Card", child: "tenant-col" },
+          { id: "tenant-col", component: "Column", children: ["tenant-head", "tenant-sub", "tenant-div", "tenant-fields"] },
+          { id: "tenant-head", component: "Row", children: ["tenant-icon", "tenant-title"], align: "center" },
+          { id: "tenant-icon", component: "Icon", name: "info", size: 19 },
+          { id: "tenant-title", component: "Text", text: tenantName === "-" ? "테넌트 정보" : tenantName, variant: "h2" },
+          { id: "tenant-sub", component: "Text", text: tenantId === "-" ? message : `${message} · ${tenantId}`, variant: "caption" },
+          { id: "tenant-div", component: "Divider", axis: "horizontal" },
+          { id: "tenant-fields", component: "List", children: { componentId: "tenant-field", path: "/fields" } },
+          { id: "tenant-field", component: "Row", children: ["tenant-field-label", "tenant-field-value"], justify: "spaceBetween", gap: 16 },
+          { id: "tenant-field-label", component: "Text", text: { path: "label" }, variant: "caption", weight: 1 },
+          { id: "tenant-field-value", component: "Text", text: { path: "value" }, variant: "body", weight: 2 },
+        ],
+      },
+    },
+    {
+      updateDataModel: {
+        path: "/",
+        value: {
+          tenant,
+          fields,
+        },
+      },
+    },
+  ];
+}
+
+export function a2JsonToEnvelope(payload: unknown): Array<Record<string, unknown>> | null {
+  if (!isRecord(payload)) return null;
+
+  const tenantInfoEnvelope = buildTenantInfoEnvelope(payload);
+  if (tenantInfoEnvelope) return tenantInfoEnvelope;
+
+  const extracted = extractJsonItems(payload);
+  if (!extracted) return null;
+
+  const { items, summary, shape } = extracted;
+  const message = typeof payload.message === "string" ? payload.message : "조회 결과";
+  const status = typeof payload.status === "number" ? payload.status : null;
+  const title = shape === "accident"
+    ? `사고 현황 · ${items.length}건`
+    : shape === "activityScore"
+      ? `사업장 활동 점수 · ${items.length}개 사업장`
+    : `${message} · ${items.length}건`;
+  const fallbackKeys = Array.from(new Set(items.flatMap((item) => Object.keys(item))))
+    .filter((key) => items.some((item) => item[key] != null))
+    .slice(0, 8);
+  const approvalColumns = [
+    { key: "gbNm", label: "구분", w: 180 },
+    { key: "bplcNm", label: "사업장", w: 130 },
+    { key: "statusNm", label: "상태", w: 90 },
+    { key: "standbyApprovalRoleNm", label: "결재역할", w: 95 },
+    { key: "draftEmpNm", label: "기안자", w: 90 },
+    { key: "draftDt", label: "기안일시", w: 150 },
+    { key: "approvalId", label: "결재 ID", w: 260 },
+  ];
+  const accidentColumns = [
+    { key: "bplcNm", label: "사업장", w: 150 },
+    { key: "disasterTypeNm", label: "재해유형", w: 100 },
+    { key: "acdntDt", label: "사고일시", w: 160 },
+    { key: "bplcId", label: "사업장 ID", w: 260 },
+  ];
+  const activityScoreColumns = [
+    { key: "bplcNm", label: "사업장", w: 160 },
+    { key: "totScore", label: "활동 점수", w: 90 },
+    { key: "totGrade", label: "등급", w: 70 },
+  ];
+  const preferredColumns = shape === "approval"
+    ? approvalColumns
+    : shape === "accident"
+      ? accidentColumns
+      : shape === "activityScore"
+        ? activityScoreColumns
+      : null;
+  const columns = (preferredColumns
+    ? preferredColumns.filter((col) => items.some((item) => item[col.key] != null))
+    : fallbackKeys.map((key) => ({ key, label: key, w: key.toLowerCase().includes("id") ? 240 : 140 }))
+  ).map((col) => ({ ...col, kind: "text" }));
+
+  const summaryText = shape === "accident" && isRecord(summary)
+    ? `${summary.currentYear ?? "올해"}년 ${summary.currentYearCnt ?? items.length}건 · 전년 ${summary.prevYearCnt ?? 0}건`
+    : shape === "activityScore"
+      ? "사업장별 활동 점수 및 등급"
+    : status == null ? "API JSON 응답" : `API JSON 응답 · HTTP ${status}`;
+
+  const rootChildren = shape === "activityScore"
+    ? ["json-title", "json-subtitle", "json-chart"]
+    : ["json-title", "json-subtitle", "json-table"];
+
+  const components: A2UIComponent[] = [
+    { id: "root", component: "Column", children: rootChildren },
+    { id: "json-title", component: "Text", text: title, variant: "title" },
+    {
+      id: "json-subtitle",
+      component: "Text",
+      text: summaryText,
+      variant: "caption",
+    },
+    {
+      id: "json-table",
+      component: "DataTable",
+      rows: { path: "/items" },
+      columns,
+    },
+    {
+      id: "json-chart",
+      component: "BarChart",
+      rows: { path: "/items" },
+      labelKey: "bplcNm",
+      valueKey: "totScore",
+      gradeKey: "totGrade",
+      max: 100,
+    },
+  ];
+
+  return [
+    {
+      createSurface: {
+        surfaceId: "json-data-surface",
+        catalogId: A2UI_CATALOG_BASIC,
+        theme: { primaryColor: "#2563EB", agentDisplayName: "JSON Result" },
+        sendDataModel: true,
+      },
+    },
+    {
+      updateComponents: {
+        components,
+      },
+    },
+    {
+      updateDataModel: {
+        path: "/",
+        value: {
+          items,
+          summary: {
+            count: items.length,
+            title: message,
+            ...summary,
+          },
+        },
+      },
+    },
+  ];
+}
+
 /* ---- JSON Pointer helpers (RFC 6901 + relative paths) ---- */
 export function a2ParsePath(path: unknown, scopeBase?: string): string[] {
   if (path == null) return [];

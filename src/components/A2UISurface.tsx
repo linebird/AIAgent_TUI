@@ -151,11 +151,531 @@ function A2UINode({ id, scopeBase, ctx }: { id: string; scopeBase: string; ctx: 
     case "Select":     return <A2UISelect comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "TagInput":   return <A2UITagInput comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "DataTable":  return <A2UIDataTable comp={comp} scopeBase={scopeBase} ctx={ctx} />;
+    case "BarChart":   return <A2UIBarChart comp={comp} scopeBase={scopeBase} ctx={ctx} />;
+    case "PendingApprovalListCard": return <A2UIPendingApprovalListCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
+    case "ActvScoreSummaryCard": return <A2UIActvScoreSummaryCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
+    case "CompletionGaugeCard": return <A2UICompletionGaugeCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
+    case "OpertPlanStatusCard": return <A2UIOpertPlanStatusCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
+    case "OpertStopStatusCard": return <A2UIOpertStopStatusCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "Tabs":       return <A2UITabs comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "Modal":      return <A2UIModal comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     default:
       return <div className="a2ui-unknown">⚠ 미지원 컴포넌트: {comp.component}</div>;
   }
+}
+
+// ---- BarChart --------------------------------------------------
+function A2UIBarChart({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: string; ctx: A2UICtx }) {
+  const model = ctx.model;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rowsRef = (comp.rows as any)?.path;
+  const rows = (a2Get(model, rowsRef, scopeBase) || []) as Record<string, unknown>[];
+  const labelKey = (comp.labelKey as string) || "label";
+  const valueKey = (comp.valueKey as string) || "value";
+  const gradeKey = comp.gradeKey as string | undefined;
+  const values = rows.map((row) => Number(row[valueKey] ?? 0)).filter((value) => Number.isFinite(value));
+  const max = Number(comp.max ?? Math.max(...values, 0)) || 1;
+
+  return (
+    <div className="a2ui-bar-chart">
+      {rows.map((row, i) => {
+        const label = a2ToStr(row[labelKey]);
+        const value = Number(row[valueKey] ?? 0);
+        const pct = Math.max(0, Math.min(100, (value / max) * 100));
+        const grade = gradeKey ? a2ToStr(row[gradeKey]) : "";
+
+        return (
+          <div key={i} className="a2ui-bar-row">
+            <div className="a2ui-bar-label" title={label}>{label}</div>
+            <div className="a2ui-bar-track" aria-label={`${label} ${value}`}>
+              <div className="a2ui-bar-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="a2ui-bar-value">
+              <strong>{Number.isFinite(value) ? value : 0}</strong>
+              {grade && <span>{grade}</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---- ActvScoreSummaryCard -------------------------------------
+function A2UIActvScoreSummaryCard({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: string; ctx: A2UICtx }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const value = a2Resolve((comp as any).value, ctx.model, scopeBase) as Record<string, unknown> | null;
+  const title = a2ToStr(value?.title ?? comp.title ?? "종합 안전활동 점수");
+  const score = Number(value?.score ?? 0) || 0;
+  const maxScore = Number(value?.maxScore ?? 100) || 100;
+  const gradeName = a2ToStr(value?.gradeName ?? "-");
+  const gradeTone = a2ToStr(value?.gradeTone ?? "etc");
+  const previousLabel = a2ToStr(value?.previousLabel ?? "상반기 대비 +0점");
+  const siteName = a2ToStr(value?.siteName ?? "-");
+  const averageScore = Number(value?.averageScore ?? 0) || 0;
+  const averageDeltaText = a2ToStr(value?.averageDeltaText ?? "+0점");
+  const gradeCounts = Array.isArray(value?.gradeCounts)
+    ? (value.gradeCounts as Record<string, unknown>[])
+    : [];
+  const deltaTone = averageDeltaText.trim().startsWith("-") ? "bad" : "good";
+
+  return (
+    <div className="a2ui-actv-card">
+      <section className="a2ui-actv-score">
+        <div className="a2ui-actv-title">{title}</div>
+        <div className="a2ui-actv-main">
+          <strong>{score}</strong>
+          <span>/ {maxScore}점</span>
+          <em className={`a2ui-actv-badge ${gradeTone}`}>{gradeName}</em>
+        </div>
+        <div className="a2ui-actv-prev">
+          <span aria-hidden="true">-</span>
+          <b>{previousLabel}</b>
+        </div>
+        <div className="a2ui-actv-average">
+          <span className="a2ui-actv-people">{ICONS.activity}</span>
+          <span>&lt;{siteName}&gt; 전체 사업장 평균</span>
+          <strong>{averageScore}점 대비</strong>
+          <b className={deltaTone}>{averageDeltaText}</b>
+        </div>
+      </section>
+      <section className="a2ui-actv-counts">
+        <div className="a2ui-actv-title">평가 별 개수</div>
+        <div className="a2ui-actv-count-grid">
+          {gradeCounts.map((item) => {
+            const label = a2ToStr(item.label ?? "-");
+            const tone = a2ToStr(item.tone ?? "etc");
+            const count = Number(item.count ?? 0) || 0;
+
+            return (
+              <div key={label} className="a2ui-actv-count-box">
+                <div className={`a2ui-actv-count-label ${tone}`}>{label}</div>
+                <div className="a2ui-actv-count-value">
+                  <strong>{count}</strong>
+                  <span>개</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ---- PendingApprovalListCard -----------------------------------
+function A2UIPendingApprovalListCard({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: string; ctx: A2UICtx }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const value = a2Resolve((comp as any).value, ctx.model, scopeBase) as Record<string, unknown> | null;
+  const title = a2ToStr(value?.title ?? comp.title ?? "결재 대기 중 문서");
+  const total = Number(value?.total ?? 0) || 0;
+  const updatedAt = a2ToStr(value?.updatedAt ?? "");
+  const description = a2ToStr(value?.description ?? "");
+  const documents = Array.isArray(value?.documents)
+    ? (value.documents as Record<string, unknown>[])
+    : [];
+
+  return (
+    <div className="a2ui-approval-card">
+      <div className="a2ui-approval-head">
+        <div className="a2ui-approval-title">
+          <span>{title}</span>
+          <strong>{total}</strong>
+        </div>
+        {updatedAt && <div className="a2ui-approval-updated">업데이트 {updatedAt}</div>}
+      </div>
+      <div className="a2ui-approval-body">
+        {description && <div className="a2ui-approval-desc">{description}</div>}
+        <div className="a2ui-approval-list" role="list" aria-label={`${title} ${total}건`}>
+          {documents.map((item, index) => {
+            const siteName = a2ToStr(item.siteName ?? "-");
+            const documentType = a2ToStr(item.documentType ?? "-");
+            const draftedAt = a2ToStr(item.draftedAt ?? "-");
+            const drafterName = a2ToStr(item.drafterName ?? "-");
+            const drafterRole = a2ToStr(item.drafterRole ?? "-");
+            const standbyRoleName = a2ToStr(item.standbyRoleName ?? "-");
+            const roleTone = a2ToStr(item.roleTone ?? "approval");
+            const detail = `${documentType} (${draftedAt}) / ${drafterName} | ${drafterRole}`;
+
+            return (
+              <div key={a2ToStr(item.id ?? index)} className="a2ui-approval-item" role="listitem">
+                <div className="a2ui-approval-main">
+                  <strong>{siteName}</strong>
+                  <span title={detail}>
+                    <b>{documentType}</b> ({draftedAt}) / {drafterName} | {drafterRole}
+                  </span>
+                </div>
+                <span className={`a2ui-approval-pill ${roleTone}`}>
+                  <i aria-hidden="true" />
+                  {standbyRoleName}
+                </span>
+              </div>
+            );
+          })}
+          {documents.length === 0 && (
+            <div className="a2ui-approval-empty">결재 대기 중인 문서가 없습니다.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- CompletionGaugeCard ---------------------------------------
+function A2UICompletionGaugeCard({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: string; ctx: A2UICtx }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const value = a2Resolve((comp as any).value, ctx.model, scopeBase) as Record<string, unknown> | null;
+  const title = a2ToStr(value?.title ?? comp.title ?? "이행률");
+  const percent = Math.max(0, Math.min(100, Number(value?.percent ?? 0) || 0));
+  const completed = Number(value?.completed ?? 0) || 0;
+  const inProgress = Number(value?.inProgress ?? 0) || 0;
+  const total = Number(value?.total ?? completed + inProgress) || 0;
+  const [activeTooltip, setActiveTooltip] = useState<"completed" | "progress" | null>(null);
+  const progressPercent = Math.max(0, 100 - percent);
+  const progressDisplayPercent = total > 0
+    ? Math.max(0, Math.min(100, Math.round((inProgress / total) * 100)))
+    : progressPercent;
+  const pointOnGauge = (startPercent: number, sweepPercent: number) => {
+    const midPercent = startPercent + sweepPercent / 2;
+    const angle = (180 - midPercent * 1.8) * Math.PI / 180;
+    const x = 99 + 83 * Math.cos(angle);
+    const y = 99 - 83 * Math.sin(angle);
+    return {
+      x: Math.max(45, Math.min(153, x)),
+      y: Math.max(2, Math.min(58, y - 24)),
+    };
+  };
+  const completedPoint = pointOnGauge(0, percent || 1);
+  const progressPoint = pointOnGauge(percent, progressPercent || 1);
+  const tooltip = activeTooltip === "progress"
+    ? {
+        label: "진행중",
+        detail: `${inProgress}건 (${progressDisplayPercent}%)`,
+        x: progressPoint.x,
+        y: progressPoint.y,
+      }
+    : {
+        label: "완료",
+        detail: `${completed}건 (${percent}%)`,
+        x: completedPoint.x,
+        y: completedPoint.y,
+      };
+
+  return (
+    <div className="a2ui-completion-card">
+      <div className="a2ui-completion-head">
+        <div className="a2ui-completion-title">{title}</div>
+        {/* <span className="a2ui-completion-chev">{ICONS.chevron}</span> */}
+      </div>
+      <div className="a2ui-completion-body">
+        <div
+          className="a2ui-completion-gauge"
+          aria-label={`${title} ${percent}%`}
+          onMouseLeave={() => setActiveTooltip(null)}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setActiveTooltip(null);
+            }
+          }}
+        >
+          <svg className="a2ui-completion-svg" viewBox="0 0 198 104" aria-hidden="true">
+            <path className="a2ui-completion-track" d="M 16 99 A 83 83 0 0 1 182 99" pathLength={100} />
+            {percent > 0 && (
+              <path
+                className="a2ui-completion-arc done"
+                d="M 16 99 A 83 83 0 0 1 182 99"
+                pathLength={100}
+                strokeDasharray={`${percent} ${100 - percent}`}
+              />
+            )}
+            {progressPercent > 0 && (
+              <path
+                className="a2ui-completion-hit progress"
+                d="M 16 99 A 83 83 0 0 1 182 99"
+                pathLength={100}
+                strokeDasharray={`${progressPercent} ${percent}`}
+                strokeDashoffset={-percent}
+                tabIndex={0}
+                role="img"
+                aria-label={`진행중 ${inProgress}건 ${progressDisplayPercent}%`}
+                onMouseEnter={() => setActiveTooltip("progress")}
+                onFocus={() => setActiveTooltip("progress")}
+              />
+            )}
+            {percent > 0 && (
+              <path
+                className="a2ui-completion-hit done"
+                d="M 16 99 A 83 83 0 0 1 182 99"
+                pathLength={100}
+                strokeDasharray={`${percent} ${100 - percent}`}
+                tabIndex={0}
+                role="img"
+                aria-label={`완료 ${completed}건 ${percent}%`}
+                onMouseEnter={() => setActiveTooltip("completed")}
+                onFocus={() => setActiveTooltip("completed")}
+              />
+            )}
+          </svg>
+          <div
+            className={"a2ui-completion-tooltip" + (activeTooltip ? " on" : "")}
+            role="tooltip"
+            style={{
+              "--a2ui-tip-x": `${tooltip.x}px`,
+              "--a2ui-tip-y": `${tooltip.y}px`,
+            } as React.CSSProperties}
+          >
+            <span>{tooltip.label}</span>
+            <span>{tooltip.detail}</span>
+          </div>
+          <div className="a2ui-completion-value">
+            <strong>{percent}</strong>
+            <span>%</span>
+          </div>
+        </div>
+        <div className="a2ui-completion-stats">
+          <div className="a2ui-completion-stat">
+            <span className="a2ui-completion-dot primary" />
+            <span className="a2ui-completion-label">완료</span>
+            <strong>{completed}</strong>
+            <span className="a2ui-completion-unit">건</span>
+          </div>
+          <div className="a2ui-completion-stat">
+            <span className="a2ui-completion-dot muted" />
+            <span className="a2ui-completion-label">진행중(미조치)</span>
+            <strong className="muted">{inProgress}</strong>
+            <span className="a2ui-completion-unit">건</span>
+          </div>
+          <div className="a2ui-completion-rule" />
+          <div className="a2ui-completion-stat total">
+            <span className="a2ui-completion-dot total" />
+            <span className="a2ui-completion-label">전체</span>
+            <strong>{total}</strong>
+            <span className="a2ui-completion-unit">건</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- OpertPlanStatusCard ---------------------------------------
+function A2UIOpertPlanStatusCard({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: string; ctx: A2UICtx }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const value = a2Resolve((comp as any).value, ctx.model, scopeBase) as Record<string, unknown> | null;
+  const title = a2ToStr(value?.title ?? comp.title ?? "작업계획서 실시간 처리 상태");
+  const waitCount = Number(value?.waitCount ?? 0) || 0;
+  const completedCount = Number(value?.completedCount ?? 0) || 0;
+  const statuses = [
+    { label: "계획 작성 중", count: Number(value?.writingCount ?? 0) || 0, color: "#7AB6F0" },
+    { label: "계획 결재 중", count: Number(value?.progressCount ?? 0) || 0, color: "#7C3AED" },
+    { label: "작업 승인", count: Number(value?.approvalCount ?? 0) || 0, color: "#F5B400" },
+    { label: "작업 완료", count: completedCount, color: "#08B86F" },
+  ];
+  const formats = Array.isArray(value?.formats)
+    ? (value.formats as Record<string, unknown>[]).map((item, index) => ({
+        label: a2ToStr(item.label ?? `구분 ${index + 1}`),
+        count: Number(item.count ?? 0) || 0,
+        color: ["#7B74F2", "#7AB6F0", "#08B86F", "#F5B400", "#F97316"][index % 5],
+      }))
+    : [];
+  const formatTotal = formats.reduce((sum, item) => sum + item.count, 0);
+  let running = 0;
+  const segments = formats
+    .filter((item) => item.count > 0 && formatTotal > 0)
+    .map((item) => {
+      const start = (running / formatTotal) * 360;
+      running += item.count;
+      const end = (running / formatTotal) * 360;
+      return `${item.color} ${start}deg ${end}deg`;
+    });
+  const donutBackground = segments.length
+    ? `conic-gradient(${segments.join(", ")})`
+    : "var(--a2ui-opert-empty)";
+  const statusTotal = waitCount + statuses.reduce((sum, item) => sum + item.count, 0);
+  const statusDenom = Math.max(statusTotal, 1);
+  const formatDenom = Math.max(formatTotal, 1);
+  const percentText = (count: number, denom: number) => `${Math.round((count / denom) * 100)}%`;
+
+  return (
+    <div className="a2ui-opert-card">
+      <div className="a2ui-opert-head">
+        <div className="a2ui-opert-title">{title}</div>
+        {/* <span className="a2ui-opert-chev">{ICONS.chevron}</span> */}
+      </div>
+      <div className="a2ui-opert-body">
+        <section className="a2ui-opert-left">
+          <div className="a2ui-opert-section-title">작업 상태별 실시간 건수</div>
+          <div
+            className="a2ui-opert-wait a2ui-opert-tip-host"
+            tabIndex={0}
+            aria-label={`작업 대기 ${waitCount}건 ${percentText(waitCount, statusDenom)}`}
+          >
+            <span>작업 대기</span>
+            <strong>{waitCount}</strong>
+            <em>건</em>
+            <div className="a2ui-opert-tooltip" role="tooltip">
+              <span>작업 대기</span>
+              <span>{waitCount}건 ({percentText(waitCount, statusDenom)})</span>
+            </div>
+          </div>
+          <div className="a2ui-opert-divider" />
+          <div className="a2ui-opert-status-list">
+            {statuses.map((item) => (
+              <div
+                key={item.label}
+                className="a2ui-opert-status a2ui-opert-tip-host"
+                tabIndex={0}
+                aria-label={`${item.label} ${item.count}건 ${percentText(item.count, statusDenom)}`}
+              >
+                <span className="a2ui-opert-dot" style={{ background: item.color }} />
+                <span className="a2ui-opert-label">{item.label}</span>
+                <strong style={{ color: item.color }}>{item.count}</strong>
+                <em>건</em>
+                <div className="a2ui-opert-tooltip" role="tooltip">
+                  <span>{item.label}</span>
+                  <span>{item.count}건 ({percentText(item.count, statusDenom)})</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section className="a2ui-opert-right">
+          <div className="a2ui-opert-section-title">완료 작업 구분별 누적 현황</div>
+          <div
+            className="a2ui-opert-donut"
+            style={{ "--a2ui-opert-donut": donutBackground } as React.CSSProperties}
+            aria-label={`완료 작업 ${formatTotal}건`}
+            tabIndex={0}
+          >
+            <div className="a2ui-opert-donut-hole">
+              <strong>{formatTotal}</strong>
+              <span>건</span>
+            </div>
+            <div className="a2ui-opert-tooltip a2ui-opert-donut-tooltip" role="tooltip">
+              <span>완료 작업</span>
+              <span>{formatTotal}건 ({percentText(formatTotal, statusDenom)})</span>
+            </div>
+          </div>
+          {formats.length > 0 && (
+            <div className="a2ui-opert-format-list">
+              {formats.map((item) => (
+                <div
+                  key={item.label}
+                  className="a2ui-opert-format a2ui-opert-tip-host"
+                  tabIndex={0}
+                  aria-label={`${item.label} ${item.count}건 ${percentText(item.count, formatDenom)}`}
+                >
+                  <span className="a2ui-opert-dot" style={{ background: item.color }} />
+                  <span>{item.label}</span>
+                  <strong>{item.count}</strong>
+                  <div className="a2ui-opert-tooltip" role="tooltip">
+                    <span>{item.label}</span>
+                    <span>{item.count}건 ({percentText(item.count, formatDenom)})</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="a2ui-opert-note">* 작업 완료 기준</div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+// ---- OpertStopStatusCard ---------------------------------------
+function A2UIOpertStopStatusCard({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: string; ctx: A2UICtx }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const value = a2Resolve((comp as any).value, ctx.model, scopeBase) as Record<string, unknown> | null;
+  const title = a2ToStr(value?.title ?? comp.title ?? "작업중지 요청 처리 현황");
+  const total = Number(value?.total ?? 0) || 0;
+  const waiting = Number(value?.waiting ?? 0) || 0;
+  const approval = Number(value?.approval ?? 0) || 0;
+  const reserved = Number(value?.reserved ?? 0) || 0;
+  const [activeStopTooltip, setActiveStopTooltip] = useState<"waiting" | "approval" | "reserved" | null>(null);
+  const denom = total > 0 ? total : Math.max(waiting + approval + reserved, 1);
+  const waitingPct = Math.max(0, (waiting / denom) * 100);
+  const approvalPct = Math.max(0, (approval / denom) * 100);
+  const reservedPct = Math.max(0, 100 - waitingPct - approvalPct);
+  const stopSegments = [
+    { key: "waiting" as const, label: "대기", count: waiting, percent: waitingPct, start: 0 },
+    { key: "approval" as const, label: "승인", count: approval, percent: approvalPct, start: waitingPct },
+    { key: "reserved" as const, label: "보류", count: reserved, percent: reservedPct, start: waitingPct + approvalPct },
+  ];
+  const activeStopSegment = stopSegments.find((item) => item.key === activeStopTooltip);
+  const stopTooltipX = activeStopSegment
+    ? Math.max(8, Math.min(92, activeStopSegment.start + activeStopSegment.percent / 2))
+    : 50;
+  const stopTooltipPercent = activeStopSegment
+    ? Math.round((activeStopSegment.count / denom) * 100)
+    : 0;
+
+  return (
+    <div className="a2ui-stop-card">
+      <div className="a2ui-stop-head">
+        <div className="a2ui-stop-title">{title}</div>
+        {/* <span className="a2ui-stop-chev">{ICONS.chevron}</span> */}
+      </div>
+      <div className="a2ui-stop-body">
+        <div className="a2ui-stop-section-title">대기 중 상태의 요청 건</div>
+        <div className="a2ui-stop-wait">
+          <span className="a2ui-stop-siren" aria-hidden="true" />
+          <div className="a2ui-stop-count">
+            <strong>{waiting}</strong>
+            <span>건</span>
+          </div>
+        </div>
+        <div className="a2ui-stop-divider" />
+        <div className="a2ui-stop-total-label">전체 누적</div>
+        <div
+          className="a2ui-stop-stack-wrap"
+          onMouseLeave={() => setActiveStopTooltip(null)}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setActiveStopTooltip(null);
+            }
+          }}
+        >
+          <div
+            className={"a2ui-stop-tooltip" + (activeStopTooltip ? " on" : "")}
+            role="tooltip"
+            style={{ "--a2ui-stop-tip-x": `${stopTooltipX}%` } as React.CSSProperties}
+          >
+            <span>{activeStopSegment?.label ?? ""}</span>
+            <span>{activeStopSegment ? `${activeStopSegment.count}건 (${stopTooltipPercent}%)` : ""}</span>
+          </div>
+          <div className="a2ui-stop-stack" aria-label={`전체 누적 ${total}건`}>
+            {stopSegments.map((item) => item.percent > 0 && (
+              <span
+                key={item.key}
+                className={item.key}
+                style={{ width: `${item.percent}%` }}
+                tabIndex={0}
+                role="img"
+                aria-label={`${item.label} ${item.count}건 ${Math.round((item.count / denom) * 100)}%`}
+                onMouseEnter={() => setActiveStopTooltip(item.key)}
+                onFocus={() => setActiveStopTooltip(item.key)}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="a2ui-stop-legend">
+          <div className="a2ui-stop-legend-row">
+            <span className="a2ui-stop-dot approval" />
+            <span>승인</span>
+            <strong>{approval}</strong>
+            <em>건</em>
+          </div>
+          <div className="a2ui-stop-legend-row muted">
+            <span className="a2ui-stop-dot reserved" />
+            <span>보류</span>
+            <strong>{reserved}</strong>
+            <em>건</em>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ---- Button ----------------------------------------------------
