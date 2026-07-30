@@ -2,12 +2,14 @@ import type { Source, CoTStep } from "@/types";
 import { A2UI_ANSWERS, type A2UIAnswer } from "./a2ui-data";
 
 export const SUGGESTIONS = [
-  { text: "공종명으로 위험성평가를 자동작성해줘. (배관·용접 / 작업환경·장비 태그)", icon: "Shield" },
-  { text: "주문 서비스가 결제 서비스 호출 시 간헐적 타임아웃이 발생해요. 원인과 해결책을 알려줘.", icon: "AlertTriangle" },
-  { text: "결제 승인 API의 요청·응답 명세를 표로 정리하고 예시 페이로드를 보여줘.", icon: "Braces" },
-  { text: "결제 서비스에 적용할 Resilience4j 서킷브레이커 설정 예시를 작성해줘.", icon: "Code2" },
-  { text: "최근 1시간 order-service 에러 로그를 분석해서 핵심 원인을 요약해줘.", icon: "FileText" },
-  { text: "payment-service 카나리 배포를 승인할 패널을 띄워줘. (A2UI 생성형 UI)", icon: "Layers" },
+  { text: "사업장 활동 점수 알려줘.", icon: "FileText" },
+  { text: "결재 대기 중 문서 알려줘.", icon: "FileText" },
+  { text: "재해 발생 내역 알려줘.", icon: "FileText" },
+  { text: "주간 일정 조회", icon: "AlertTriangle" },
+  { text: "작업계획서 실시간 처리 상태 조회", icon: "Code2" },
+  { text: "위험성 감소대책 이행률 조회", icon: "Shield" },
+  { text: "부적합 조치율 조회", icon: "Braces" },
+  { text: "작업중지 요청 처리 현황 조회", icon: "Layers" },
 ];
 
 export const CAPABILITIES = [

@@ -154,6 +154,7 @@ function A2UINode({ id, scopeBase, ctx }: { id: string; scopeBase: string; ctx: 
     case "BarChart":   return <A2UIBarChart comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "PendingApprovalListCard": return <A2UIPendingApprovalListCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "ActvScoreSummaryCard": return <A2UIActvScoreSummaryCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
+    case "WeeklyScheduleCard": return <A2UIWeeklyScheduleCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "CompletionGaugeCard": return <A2UICompletionGaugeCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "OpertPlanStatusCard": return <A2UIOpertPlanStatusCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "OpertStopStatusCard": return <A2UIOpertStopStatusCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
@@ -162,6 +163,80 @@ function A2UINode({ id, scopeBase, ctx }: { id: string; scopeBase: string; ctx: 
     default:
       return <div className="a2ui-unknown">⚠ 미지원 컴포넌트: {comp.component}</div>;
   }
+}
+
+// ---- WeeklyScheduleCard ---------------------------------------
+function A2UIWeeklyScheduleCard({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: string; ctx: A2UICtx }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const value = a2Resolve((comp as any).value, ctx.model, scopeBase) as Record<string, unknown> | null;
+  const title = a2ToStr(value?.title ?? comp.title ?? "주간 일정");
+  const monthLabel = a2ToStr(value?.monthLabel ?? "");
+  const activeTab = a2ToStr(value?.activeTab ?? "사업장");
+  const tabs = Array.isArray(value?.tabs) ? value.tabs.map((tab) => a2ToStr(tab)) : ["사업장", "개인"];
+  const days = Array.isArray(value?.days) ? (value.days as Record<string, unknown>[]) : [];
+
+  return (
+    <div className="a2ui-week-card">
+      <div className="a2ui-week-title">{title}</div>
+      <div className="a2ui-week-head">
+        <div className="a2ui-week-month">{monthLabel}</div>
+        <div className="a2ui-week-tabs" role="tablist" aria-label="일정 범위">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              className={tab === activeTab ? "on" : ""}
+              role="tab"
+              aria-selected={tab === activeTab}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="a2ui-week-body">
+        <button type="button" className="a2ui-week-nav" aria-label="이전 주">{ICONS.chevron}</button>
+        <div className="a2ui-week-grid">
+          {days.map((day, index) => {
+            const dayText = a2ToStr(day.day ?? "");
+            const dateText = a2ToStr(day.date ?? "");
+            const items = Array.isArray(day.items) ? (day.items as Record<string, unknown>[]) : [];
+            const cls = [
+              "a2ui-week-day",
+              day.isSaturday ? "sat" : "",
+              day.isSunday ? "sun" : "",
+              day.isToday ? "today" : "",
+            ].filter(Boolean).join(" ");
+
+            return (
+              <div key={dateText || index} className={cls}>
+                <div className="a2ui-week-day-num">
+                  <span>{dayText}</span>
+                </div>
+                <div className="a2ui-week-items">
+                  {items.map((item, itemIndex) => {
+                    const name = a2ToStr(item.name ?? "일정");
+                    const color = a2ToStr(item.color ?? "#FFE6C2");
+
+                    return (
+                      <div
+                        key={a2ToStr(item.id ?? `${dateText}-${itemIndex}`)}
+                        className="a2ui-week-event"
+                        title={name}
+                        style={{ "--a2ui-week-event-bg": color } as React.CSSProperties}
+                      >
+                        {name}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ---- BarChart --------------------------------------------------
