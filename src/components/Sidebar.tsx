@@ -53,7 +53,7 @@ export default function Sidebar({ sessions, activeId, onSelect, onNew, onDelete 
             <div className="brand-mark" />
             <div>
               <div className="brand-name">Saferyn<b>Chat</b></div>
-              <div className="brand-sub">AI Agent · 사내 운영 도우미</div>
+              <div className="brand-sub">AI Agent · 세이플린 지원 도우미</div>
             </div>
           </div>
           <button className="new-chat" onClick={onNew}>
@@ -80,8 +80,8 @@ export default function Sidebar({ sessions, activeId, onSelect, onNew, onDelete 
           <div className="user-row">
             <div className="avatar">SE</div>
             <div className="user-meta">
-              <div className="un">SRE 엔지니어</div>
-              <div className="ue">platform@safetysaas.io</div>
+              <div className="un">세이플린 전략마케팅팀 부장</div>
+              <div className="ue">bsu673739@aromit.com</div>
             </div>
             <button className="icon-btn" style={{ width: 32, height: 32 }} title="설정">
               <Settings size={17} />

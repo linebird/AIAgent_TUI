@@ -17,10 +17,9 @@ export default function Topbar({ scrolled, theme, onToggleTheme, onNewChat, onTo
         <Menu size={20} />
       </button>
       <button
-        className="icon-btn"
+        className="icon-btn only-desktop"
         onClick={onToggleSidebar}
         title="사이드바 접기"
-        style={{ display: "grid" }}
       >
         <PanelLeft size={19} />
       </button>
