@@ -168,6 +168,7 @@ function A2UINode({ id, scopeBase, ctx }: { id: string; scopeBase: string; ctx: 
     case "FileUpload": return <A2UIFileUpload comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "DataTable":  return <A2UIDataTable comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "BarChart":   return <A2UIBarChart comp={comp} scopeBase={scopeBase} ctx={ctx} />;
+    case "AccidentListCard": return <A2UIAccidentListCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "PendingApprovalListCard": return <A2UIPendingApprovalListCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "ActvScoreSummaryCard": return <A2UIActvScoreSummaryCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "WeeklyScheduleCard": return <A2UIWeeklyScheduleCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
@@ -179,6 +180,59 @@ function A2UINode({ id, scopeBase, ctx }: { id: string; scopeBase: string; ctx: 
     default:
       return <div className="a2ui-unknown">⚠ 미지원 컴포넌트: {comp.component}</div>;
   }
+}
+
+// ---- AccidentListCard ------------------------------------------
+function A2UIAccidentListCard({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: string; ctx: A2UICtx }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const value = a2Resolve((comp as any).value, ctx.model, scopeBase) as Record<string, unknown> | null;
+  const title = a2ToStr(value?.title ?? comp.title ?? "사고 현황");
+  const subtitle = a2ToStr(value?.subtitle ?? "");
+  const total = Number(value?.total ?? 0) || 0;
+  const items = Array.isArray(value?.items) ? (value.items as Record<string, unknown>[]) : [];
+
+  return (
+    <div className="a2ui-accident-card">
+      <div className="a2ui-accident-head">
+        <strong>{title}</strong>
+        {subtitle && <span>{subtitle}</span>}
+      </div>
+      <div className="a2ui-accident-table-wrap" aria-label={`${title} ${total}건`}>
+        <table className="a2ui-accident-table">
+          <thead>
+            <tr>
+              <th>사업장</th>
+              <th>재해유형</th>
+              <th>사고일시</th>
+              <th>사업장 ID</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item, index) => {
+              const siteName = a2ToStr(item.siteName ?? "-");
+              const date = a2ToStr(item.date ?? "-");
+              const type = a2ToStr(item.type ?? "-");
+              const siteId = a2ToStr(item.siteId ?? item.id ?? "-");
+
+              return (
+                <tr key={a2ToStr(item.id ?? index)}>
+                  <td title={siteName}>{siteName}</td>
+                  <td title={type}>{type}</td>
+                  <td title={date}>{date}</td>
+                  <td title={siteId}>{siteId}</td>
+                </tr>
+              );
+            })}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={4} className="a2ui-accident-empty">조회된 사고/재해 내역이 없습니다.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 }
 
 // ---- WeeklyScheduleCard ---------------------------------------

@@ -7,8 +7,10 @@ import { a2ApplyEnvelope, a2JsonToEnvelope, a2SetImmutable } from "@/lib/a2ui";
 import { a2uiActionReply, type A2UIActionPayload } from "@/lib/a2ui-data";
 
 const LS_KEY = "safetysaas_agent_v1";
-const CHAT_API_URL = "http://localhost:8000/chat/stream"; // 클라우드 서버에서는 서버의 IP 주소를 사용해야 합니다. (localhost는 안됨. 223.130.159.179) 
-const A2UI_ACTION_API_URL = "http://localhost:8000/a2ui/action";
+// const CHAT_API_URL = "http://localhost:8000/chat/stream"; // 클라우드 서버에서는 서버의 IP 주소를 사용해야 합니다. (localhost는 안됨. 223.130.159.179) 
+// const A2UI_ACTION_API_URL = "http://localhost:8000/a2ui/action";
+const CHAT_API_URL = "https://ssrapi.mydaas.kr/chat/stream"; // 클라우드 서버에서는 서버의 IP 주소를 사용해야 합니다. (localhost는 안됨. 223.130.159.179) 
+const A2UI_ACTION_API_URL = "https://ssrapi.mydaas.kr/a2ui/action";
 
 type A2UIActionPayloadWithFiles = A2UIActionPayload & { files?: File[] };
 

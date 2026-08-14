@@ -987,6 +987,109 @@
   background: oklch(0.31 0.08 155);
 }
 
+/* AccidentListCard */
+.a2ui-accident-card {
+  width: min(676px, 100%);
+  padding: 16px 17px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.a2ui-accident-head {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 0 16px;
+  background: transparent;
+}
+.a2ui-accident-head strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+.a2ui-accident-head span {
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 800;
+}
+.a2ui-accident-table-wrap {
+  overflow: auto;
+  max-height: 354px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  scrollbar-color: oklch(0.78 0 0) transparent;
+  scrollbar-width: thin;
+}
+.a2ui-accident-table-wrap::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.a2ui-accident-table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+.a2ui-accident-table-wrap::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: oklch(0.78 0 0);
+}
+.a2ui-accident-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+.a2ui-accident-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  min-width: 148px;
+  padding: 13px 14px;
+  background: #0064b7;
+  border-right: 1px solid color-mix(in oklch, #fff 18%, transparent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  text-align: left;
+  white-space: nowrap;
+}
+.a2ui-accident-table th:nth-child(2) {
+  min-width: 100px;
+}
+.a2ui-accident-table th:nth-child(3) {
+  min-width: 160px;
+}
+.a2ui-accident-table th:nth-child(4) {
+  min-width: 230px;
+}
+.a2ui-accident-table td {
+  max-width: 260px;
+  overflow: hidden;
+  padding: 18px 14px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+.a2ui-accident-table tbody tr:nth-child(even) td {
+  background: var(--surface-2);
+}
+.a2ui-accident-empty {
+  height: 96px;
+  text-align: center;
+  color: var(--text-faint);
+}
+[data-theme="dark"] .a2ui-accident-table th {
+  background: oklch(0.46 0.14 250);
+}
+
 /* CompletionGaugeCard */
 .a2ui-completion-card {
   width: min(262px, 100%);
@@ -1796,6 +1899,26 @@
   }
   .a2ui-approval-pill {
     justify-self: start;
+  }
+  .a2ui-accident-head {
+    padding-bottom: 10px;
+  }
+  .a2ui-accident-card {
+    padding: 12px;
+  }
+  .a2ui-accident-table th,
+  .a2ui-accident-table td {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .a2ui-accident-table th {
+    min-width: 92px;
+  }
+  .a2ui-accident-table th:nth-child(3) {
+    min-width: 138px;
+  }
+  .a2ui-accident-table th:nth-child(4) {
+    min-width: 210px;
   }
   .a2ui-completion-body,
   .a2ui-stop-body {
