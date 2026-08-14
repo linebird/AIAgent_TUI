@@ -344,6 +344,20 @@ export function a2uiActionReply(action: A2UIActionPayload): A2UIActionReply {
         a2ui: buildRiskResultA2UI(trade, tags),
       };
     }
+    case "register_safety_report": {
+      const label = ctx.kind === "nearMiss" ? "아차사고" : "안전제안";
+      const photos = Array.isArray(ctx.photos) ? ctx.photos : [];
+      return {
+        md: `✅ **${label} 등록 요청을 접수했습니다.**\n\n` +
+          `- 청취일시: ${ctx.receiptDateTime || "-"}\n` +
+          `- 근로자 성명: ${ctx.workerName || "-"}\n` +
+          `- 소속: ${ctx.affiliation || "-"}\n` +
+          `- 위치: ${ctx.location || "-"}\n` +
+          `- 사진: ${photos.length}개\n\n` +
+          `> ${ctx.content || ""}\n\n` +
+          `실제 등록 API가 연결되면 이 액션에서 저장 요청을 전송하면 됩니다.`,
+      };
+    }
     default:
       return { md: `\`${action.name}\` 액션을 접수했어요.` };
   }

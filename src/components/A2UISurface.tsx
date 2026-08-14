@@ -44,6 +44,21 @@ interface A2UICtx {
   onAction: (payload: A2UIActionPayload) => void;
 }
 
+type A2UIActionPayloadWithFiles = A2UIActionPayload & { files?: File[] };
+
+const A2UI_FILE_STORE = new Map<string, File[]>();
+
+function fileStoreKey(surfaceId: string, path: string) {
+  return `${surfaceId}:${path}`;
+}
+
+function surfaceFiles(surfaceId: string): File[] {
+  const prefix = `${surfaceId}:`;
+  return Array.from(A2UI_FILE_STORE.entries())
+    .filter(([key]) => key.startsWith(prefix))
+    .flatMap(([, files]) => files);
+}
+
 // ---- Text with markdown inline rendering -----------------------
 function renderMd(text: string): string {
   try { return marked(text, { gfm: true, breaks: false }) as string; } catch { return text; }
@@ -150,6 +165,7 @@ function A2UINode({ id, scopeBase, ctx }: { id: string; scopeBase: string; ctx: 
     case "Switch":     return <A2UISwitch comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "Select":     return <A2UISelect comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "TagInput":   return <A2UITagInput comp={comp} scopeBase={scopeBase} ctx={ctx} />;
+    case "FileUpload": return <A2UIFileUpload comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "DataTable":  return <A2UIDataTable comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "BarChart":   return <A2UIBarChart comp={comp} scopeBase={scopeBase} ctx={ctx} />;
     case "PendingApprovalListCard": return <A2UIPendingApprovalListCard comp={comp} scopeBase={scopeBase} ctx={ctx} />;
@@ -780,7 +796,9 @@ function A2UIButton({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: 
         timestamp: new Date().toISOString(),
         context: ctxObj,
         ...(ctx.surface.sendDataModel ? { dataModel: model } : {}),
-      };
+      } as A2UIActionPayloadWithFiles;
+      const files = surfaceFiles(ctx.surface.surfaceId);
+      if (files.length) payload.files = files;
       ctx.onAction(payload);
     }
   };
@@ -808,6 +826,11 @@ function A2UITextField({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBas
   const check = a2RunChecks(comp.checks as any[], model, scopeBase);
   const showErr = touched && !check.ok;
   const long = comp.variant === "longText";
+  const inputType = comp.variant === "number"
+    ? "number"
+    : comp.variant === "datetime"
+      ? "datetime-local"
+      : "text";
   const set = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     ctx.onData(a2AbsPath(path, scopeBase), e.target.value);
   return (
@@ -815,11 +838,85 @@ function A2UITextField({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBas
       {comp.label != null && <span className="a2ui-label">{comp.label as string}</span>}
       {long
         ? <textarea className={"a2ui-input a2ui-textarea" + (showErr ? " err" : "")} value={val}
-            rows={3} placeholder={(comp.placeholder as string) || ""} onChange={set} onBlur={() => setTouched(true)} />
+            rows={3} maxLength={comp.maxLength as number | undefined} placeholder={(comp.placeholder as string) || ""} onChange={set} onBlur={() => setTouched(true)} />
         : <input className={"a2ui-input" + (showErr ? " err" : "")} value={val}
-            type={comp.variant === "number" ? "number" : "text"} placeholder={(comp.placeholder as string) || ""}
+            type={inputType} readOnly={!!comp.readonly} placeholder={(comp.placeholder as string) || ""}
             onChange={set} onBlur={() => setTouched(true)} />}
       {showErr && <span className="a2ui-err">{check.message}</span>}
+    </label>
+  );
+}
+
+// ---- FileUpload -----------------------------------------------
+function A2UIFileUpload({ comp, scopeBase, ctx }: { comp: A2UIComponent; scopeBase: string; ctx: A2UICtx }) {
+  const model = ctx.model;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const path = (comp.value as any)?.path;
+  const absPath = a2AbsPath(path, scopeBase);
+  const storeKey = fileStoreKey(ctx.surface.surfaceId, absPath);
+  const files = (a2Get(model, path, scopeBase) || []) as Array<{ name: string; size: number; type: string }>;
+  const maxFiles = Number(comp.maxFiles ?? 5);
+  const maxSizeMb = Number(comp.maxSizeMb ?? 50);
+  const accept = Array.isArray(comp.accept) ? (comp.accept as string[]) : [String(comp.accept || "")].filter(Boolean);
+  const acceptText = accept.join(", ");
+  const totalBytes = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
+  const formatBytes = (bytes: number) => {
+    if (!bytes) return "0 Bytes";
+    if (bytes < 1024) return `${bytes} Bytes`;
+    if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  };
+  const update = (nextFiles: File[]) => {
+    const limited = nextFiles.slice(0, maxFiles);
+    A2UI_FILE_STORE.set(storeKey, limited);
+    ctx.onData(absPath, limited.map((file) => ({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    })));
+  };
+  const addFiles = (list: FileList | null) => {
+    if (!list) return;
+    const current = A2UI_FILE_STORE.get(storeKey) || [];
+    update([...current, ...Array.from(list)]);
+  };
+
+  return (
+    <label className="a2ui-field">
+      {comp.label != null && <span className="a2ui-label">{comp.label as string}</span>}
+      <div className="a2ui-file-meta">
+        파일 갯수: <strong>{files.length} / {maxFiles}</strong> ({acceptText}) <span>|</span> 최대 용량: <strong>{formatBytes(totalBytes)} / {maxSizeMb} MB</strong>
+      </div>
+      <div
+        className="a2ui-file-drop"
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => {
+          event.preventDefault();
+          addFiles(event.dataTransfer.files);
+        }}
+      >
+        <input
+          type="file"
+          multiple
+          accept={acceptText}
+          onChange={(event) => {
+            addFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+        <span className="a2ui-file-ico">{ICONS.copy}</span>
+        <span>파일을 선택하거나 드래그하여 첨부하세요.</span>
+      </div>
+      {files.length > 0 && (
+        <div className="a2ui-file-list">
+          {files.map((file, index) => (
+            <span key={`${file.name}-${index}`} className="a2ui-file-chip">
+              {file.name}
+              <button type="button" onClick={() => update((A2UI_FILE_STORE.get(storeKey) || []).filter((_, i) => i !== index))}>{ICONS.close}</button>
+            </span>
+          ))}
+        </div>
+      )}
     </label>
   );
 }

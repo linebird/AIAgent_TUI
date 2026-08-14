@@ -294,6 +294,78 @@
 }
 .a2ui-tag-chip:hover { border-style: solid; border-color: var(--a2ui-primary); color: var(--a2ui-primary); }
 
+/* FileUpload */
+.a2ui-file-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.a2ui-file-meta strong {
+  color: var(--text);
+}
+.a2ui-file-meta span {
+  color: var(--text-faint);
+  margin: 0 6px;
+}
+.a2ui-file-drop {
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 124px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+.a2ui-file-drop input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.a2ui-file-ico {
+  display: grid;
+  place-items: center;
+  color: var(--a2ui-primary);
+}
+.a2ui-file-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.a2ui-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 7px 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.a2ui-file-chip button {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-faint);
+}
+.a2ui-file-chip button:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
 /* WeeklyScheduleCard */
 .a2ui-week-card {
   width: min(770px, 100%);

@@ -5,11 +5,44 @@ import { guessFileIcon, fmtSize } from "@/lib/utils";
 
 interface FileItem { name: string; size: string; icon: string; }
 
+type SpeechRecognitionConstructor = new () => SpeechRecognition;
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 const FILE_ICON: Record<string, React.ReactNode> = {
   FileText: <FileText size={15} />,
   Code: <Code size={15} />,
   File: <File size={15} />,
 };
+
+const VOICE_AUTO_SEND_DELAY_MS = 1800;
 
 interface Props {
   onSend: (text: string, files: FileItem[]) => void;
@@ -23,9 +56,15 @@ export default function Composer({ onSend, busy, onStop }: Props) {
   const [focus, setFocus] = useState(false);
   const [drag, setDrag] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(true);
+  const [speechError, setSpeechError] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const recTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const speechBaseTextRef = useRef("");
+  const speechFinalRef = useRef("");
+  const speechLatestTextRef = useRef("");
+  const speechSilenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const autoSize = useCallback(() => {
     const ta = taRef.current;
@@ -41,6 +80,19 @@ export default function Composer({ onSend, busy, onStop }: Props) {
     return () => clearTimeout(t);
   }, [text, autoSize]);
 
+  useEffect(() => {
+    setSpeechSupported(
+      typeof window !== "undefined" &&
+        !!(window.SpeechRecognition || window.webkitSpeechRecognition)
+    );
+
+    return () => {
+      if (speechSilenceTimerRef.current) clearTimeout(speechSilenceTimerRef.current);
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+    };
+  }, []);
+
   const addFiles = useCallback((list: FileList) => {
     const arr = Array.from(list).slice(0, 5).map((f) => ({
       name: f.name, size: fmtSize(f.size), icon: guessFileIcon(f.name),
@@ -48,15 +100,41 @@ export default function Composer({ onSend, busy, onStop }: Props) {
     setFiles((prev) => [...prev, ...arr].slice(0, 5));
   }, []);
 
-  const submit = useCallback(() => {
+  const sendDraft = useCallback((draftText = text) => {
     if (busy) return;
-    const t = text.trim();
+    const t = draftText.trim();
     if (!t && files.length === 0) return;
     onSend(t || "(첨부 파일 분석 요청)", files);
     setText("");
     setFiles([]);
     requestAnimationFrame(autoSize);
   }, [text, files, busy, onSend, autoSize]);
+
+  const submit = useCallback(() => {
+    sendDraft();
+  }, [sendDraft]);
+
+  const clearSpeechSilenceTimer = useCallback(() => {
+    if (speechSilenceTimerRef.current) {
+      clearTimeout(speechSilenceTimerRef.current);
+      speechSilenceTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleSpeechAutoSend = useCallback(() => {
+    clearSpeechSilenceTimer();
+    speechSilenceTimerRef.current = setTimeout(() => {
+      const draft = speechLatestTextRef.current.trim();
+      if (!draft || busy) return;
+
+      recognitionRef.current?.stop();
+      setRecording(false);
+      sendDraft(draft);
+      speechLatestTextRef.current = "";
+      speechFinalRef.current = "";
+      speechSilenceTimerRef.current = null;
+    }, VOICE_AUTO_SEND_DELAY_MS);
+  }, [busy, clearSpeechSilenceTimer, sendDraft]);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -67,19 +145,64 @@ export default function Composer({ onSend, busy, onStop }: Props) {
 
   const toggleMic = useCallback(() => {
     if (recording) {
-      if (recTimer.current) clearTimeout(recTimer.current);
+      clearSpeechSilenceTimer();
+      recognitionRef.current?.stop();
       setRecording(false);
-      setText((t) => (t ? t + " " : "") + "order-service 결제 호출 타임아웃 원인 알려줘");
-      requestAnimationFrame(autoSize);
-    } else {
-      setRecording(true);
-      recTimer.current = setTimeout(() => {
-        setRecording(false);
-        setText((t) => (t ? t + " " : "") + "order-service 결제 호출 타임아웃 원인 알려줘");
-        requestAnimationFrame(autoSize);
-      }, 2600);
+      return;
     }
-  }, [recording, autoSize]);
+
+    const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!Recognition) {
+      setSpeechSupported(false);
+      setSpeechError("이 브라우저는 음성 입력을 지원하지 않습니다.");
+      return;
+    }
+
+    const recognition = new Recognition();
+    recognitionRef.current = recognition;
+    speechBaseTextRef.current = text.trimEnd();
+    speechFinalRef.current = "";
+    speechLatestTextRef.current = speechBaseTextRef.current;
+    setSpeechError("");
+
+    recognition.lang = "ko-KR";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => setRecording(true);
+    recognition.onend = () => setRecording(false);
+    recognition.onerror = (event) => {
+      setRecording(false);
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        setSpeechError("마이크 권한이 필요합니다.");
+      } else if (event.error !== "no-speech" && event.error !== "aborted") {
+        setSpeechError("음성 입력을 시작하지 못했습니다.");
+      }
+    };
+    recognition.onresult = (event) => {
+      let interim = "";
+      let finalText = speechFinalRef.current;
+
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const transcript = event.results[i][0]?.transcript ?? "";
+        if (event.results[i].isFinal) {
+          finalText = `${finalText} ${transcript}`.trim();
+        } else {
+          interim = `${interim} ${transcript}`.trim();
+        }
+      }
+
+      speechFinalRef.current = finalText;
+      const parts = [speechBaseTextRef.current, finalText, interim].filter(Boolean);
+      const latestText = parts.join(" ");
+      speechLatestTextRef.current = latestText;
+      setText(latestText);
+      requestAnimationFrame(autoSize);
+      if ((finalText || interim).trim()) scheduleSpeechAutoSend();
+    };
+
+    recognition.start();
+  }, [recording, text, autoSize, clearSpeechSilenceTimer, scheduleSpeechAutoSend]);
 
   const canSend = text.trim().length > 0 || files.length > 0;
 
@@ -130,7 +253,12 @@ export default function Composer({ onSend, busy, onStop }: Props) {
             <button className="in-btn" title="파일 첨부" onClick={() => fileRef.current?.click()}>
               <Paperclip size={19} />
             </button>
-            <button className={"in-btn" + (recording ? " recording" : "")} title="음성 입력" onClick={toggleMic}>
+            <button
+              className={"in-btn" + (recording ? " recording" : "")}
+              title={speechSupported ? "음성 입력" : "음성 입력 미지원"}
+              onClick={toggleMic}
+              disabled={!speechSupported}
+            >
               <Mic size={19} />
             </button>
             <div className="in-spacer" />
@@ -151,6 +279,8 @@ export default function Composer({ onSend, busy, onStop }: Props) {
             <span className="spinner" style={{ borderColor: "oklch(0.6 0.2 25 / 0.3)", borderTopColor: "oklch(0.55 0.22 25)" }} />
             음성을 텍스트로 변환 중… 다시 누르면 멈춰요
           </div>
+        ) : speechError ? (
+          <div className="rec-hint error">{speechError}</div>
         ) : (
           <div className="composer-foot">
             Saferyn AI Agent는 사내 문서·코드를 근거로 답변합니다. 중요한 결정은 원문을 확인하세요.

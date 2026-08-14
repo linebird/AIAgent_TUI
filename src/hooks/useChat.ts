@@ -8,6 +8,9 @@ import { a2uiActionReply, type A2UIActionPayload } from "@/lib/a2ui-data";
 
 const LS_KEY = "safetysaas_agent_v1";
 const CHAT_API_URL = "http://localhost:8000/chat/stream"; // 클라우드 서버에서는 서버의 IP 주소를 사용해야 합니다. (localhost는 안됨. 223.130.159.179) 
+const A2UI_ACTION_API_URL = "http://localhost:8000/a2ui/action";
+
+type A2UIActionPayloadWithFiles = A2UIActionPayload & { files?: File[] };
 
 function parseSseFrames(buffer: string): { frames: Array<{ event: string; data: unknown }>; remainder: string } {
   const parts = buffer.split("\n\n");
@@ -342,10 +345,40 @@ export function useChat() {
   const runActionReply = useCallback(async (botId: string, action: A2UIActionPayload) => {
     const myRun = ++RUN;
     const cancelled = () => myRun !== RUN;
-    const reply = a2uiActionReply(action);
 
     patchMsg(botId, { phase: "status", statusText: "요청을 처리하고 있어요…" });
-    await sleep(500 + Math.random() * 300);
+    let reply = a2uiActionReply(action);
+
+    if (action.name === "register_safety_report") {
+      try {
+        const actionWithFiles = action as A2UIActionPayloadWithFiles;
+        const files = actionWithFiles.files || [];
+        const formData = new FormData();
+        const serializableAction = { ...actionWithFiles };
+        delete serializableAction.files;
+        formData.append("action", JSON.stringify(serializableAction));
+        files.forEach((file) => formData.append("files", file, file.name));
+
+        const res = await fetch(A2UI_ACTION_API_URL, {
+          method: "POST",
+          body: formData,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        reply = {
+          md: typeof data.md === "string"
+            ? data.md
+            : "✅ 등록 요청이 처리되었습니다.",
+        };
+      } catch (err) {
+        reply = {
+          md: `등록 API 호출 중 오류가 발생했습니다. (${err instanceof Error ? err.message : "Unknown error"})`,
+        };
+      }
+    } else {
+      await sleep(500 + Math.random() * 300);
+    }
+
     if (cancelled()) return;
 
     // Stream answer text
