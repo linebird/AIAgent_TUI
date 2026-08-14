@@ -44,6 +44,54 @@ const FILE_ICON: Record<string, React.ReactNode> = {
 
 const VOICE_AUTO_SEND_DELAY_MS = 1800;
 
+function normalizeSpeechText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function compactSpeechText(value: string) {
+  return normalizeSpeechText(value).replace(/\s/g, "");
+}
+
+function sliceByCompactOffset(value: string, compactOffset: number) {
+  let seen = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    if (/\s/.test(value[i])) continue;
+    if (seen >= compactOffset) return value.slice(i);
+    seen += 1;
+  }
+  return "";
+}
+
+function cleanupSpeechText(value: string) {
+  return normalizeSpeechText(value)
+    .replace(/아\s*차\s*사고/g, "아차 사고")
+    .replace(/아\s*차/g, "아차")
+    .replace(/등록해\s*줘/g, "등록해줘");
+}
+
+function mergeSpeechSegment(current: string, next: string) {
+  const a = normalizeSpeechText(current);
+  const b = normalizeSpeechText(next);
+  const compactA = compactSpeechText(a);
+  const compactB = compactSpeechText(b);
+  if (!a) return b;
+  if (!b || compactA === compactB || compactA.endsWith(compactB) || compactA.includes(compactB)) return a;
+  if (compactB.startsWith(compactA) || compactB.includes(compactA)) return b;
+
+  const max = Math.min(compactA.length, compactB.length);
+  for (let size = max; size > 0; size -= 1) {
+    if (compactA.slice(-size) === compactB.slice(0, size)) {
+      return normalizeSpeechText(a + sliceByCompactOffset(b, size));
+    }
+  }
+
+  return normalizeSpeechText(`${a} ${b}`);
+}
+
+function mergeSpeechSegments(segments: string[]) {
+  return cleanupSpeechText(segments.reduce((merged, segment) => mergeSpeechSegment(merged, segment), ""));
+}
+
 interface Props {
   onSend: (text: string, files: FileItem[]) => void;
   busy: boolean;
@@ -180,22 +228,24 @@ export default function Composer({ onSend, busy, onStop }: Props) {
       }
     };
     recognition.onresult = (event) => {
-      let interim = "";
-      let finalText = "";
+      const interimSegments: string[] = [];
+      const finalSegments: string[] = [];
 
       for (let i = 0; i < event.results.length; i += 1) {
-        const transcript = (event.results[i][0]?.transcript ?? "").trim();
+        const transcript = normalizeSpeechText(event.results[i][0]?.transcript ?? "");
         if (!transcript) continue;
         if (event.results[i].isFinal) {
-          finalText = `${finalText} ${transcript}`.trim();
+          finalSegments.push(transcript);
         } else {
-          interim = `${interim} ${transcript}`.trim();
+          interimSegments.push(transcript);
         }
       }
 
+      const finalText = mergeSpeechSegments(finalSegments);
+      const interim = mergeSpeechSegments(interimSegments);
       speechFinalRef.current = finalText;
-      const parts = [speechBaseTextRef.current, finalText, interim].filter(Boolean);
-      const latestText = parts.join(" ");
+      const spokenText = mergeSpeechSegments([finalText, interim]);
+      const latestText = mergeSpeechSegments([speechBaseTextRef.current, spokenText]);
       speechLatestTextRef.current = latestText;
       setText(latestText);
       requestAnimationFrame(autoSize);
