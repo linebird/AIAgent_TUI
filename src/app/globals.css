@@ -113,6 +113,98 @@ a { text-decoration: none; }
 .user-meta .un { font-size: 13px; font-weight: 600; }
 .user-meta .ue { font-size: 11px; color: var(--text-faint); }
 
+.profile-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: oklch(0.18 0.02 250 / 0.42);
+  backdrop-filter: blur(5px);
+}
+.profile-modal {
+  width: min(100%, 480px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.profile-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.profile-modal-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+.profile-modal-head p {
+  margin: 6px 0 0;
+  color: var(--text-faint);
+  font-size: 13px;
+  font-weight: 650;
+}
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px 20px;
+}
+.profile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.profile-form label span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+.profile-form select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 0 12px;
+  outline: none;
+}
+.profile-form select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.profile-empty {
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+.profile-submit {
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 850;
+}
+.profile-submit:hover {
+  background: var(--accent-strong);
+}
+
 /* Main column */
 .main { display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: hidden; position: relative; background: var(--bg); }
 .topbar {
@@ -145,6 +237,104 @@ a { text-decoration: none; }
 /* Thread */
 .thread { flex: 1; min-width: 0; overflow-x: hidden; overflow-y: auto; scroll-behavior: smooth; }
 .thread-inner { width: min(100%, 768px); margin: 0 auto; padding: 18px 24px 160px; }
+
+/* Login modal */
+.login-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: oklch(0.18 0.02 250 / 0.42);
+  backdrop-filter: blur(5px);
+}
+.login-modal {
+  width: min(100%, 420px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+.login-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.login-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+.login-head p {
+  margin: 6px 0 0;
+  color: var(--text-faint);
+  font-size: 13px;
+  font-weight: 650;
+}
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px 20px;
+}
+.login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.login-form label span {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+}
+.login-form input {
+  width: 100%;
+  height: 42px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  padding: 0 12px;
+  outline: none;
+}
+.login-form input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.login-message {
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.45;
+  padding: 10px 12px;
+}
+.login-submit {
+  height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 850;
+}
+.login-submit:hover {
+  background: var(--accent-strong);
+}
+.login-submit:disabled {
+  background: var(--border-strong);
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
 
 /* Empty state */
 .empty { width: min(100%, 768px); margin: 0 auto; padding: 7vh 24px 160px; }

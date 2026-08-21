@@ -7,10 +7,14 @@ import UserMessage from "@/components/UserMessage";
 import BotMessage from "@/components/BotMessage";
 import Composer from "@/components/Composer";
 import SourcePanel from "@/components/SourcePanel";
+import LoginModal from "@/components/LoginModal";
 import { useChat } from "@/hooks/useChat";
 import { useTheme } from "@/hooks/useTheme";
 import type { Source } from "@/types";
 import type { A2UIActionPayload } from "@/lib/a2ui-data";
+
+const SAFEIT_ACCESS_TOKEN_KEY = "safeit_access_token";
+const LEGACY_SAFEIT_ACCESS_TOKEN_KEY = "safeit-access-token";
 
 export default function Home() {
   const chat = useChat();
@@ -19,6 +23,7 @@ export default function Home() {
   const [sbOpen, setSbOpen] = useState(false);
   const [sbCollapsed, setSbCollapsed] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [panel, setPanel] = useState<{ open: boolean; sources: Source[] | null; focusId: number | null }>({
     open: false, sources: null, focusId: null,
   });
@@ -84,6 +89,15 @@ export default function Home() {
   };
 
   const handleSend = (text: string, files: { name: string; size: string; icon: string }[]) => {
+    const safeitAccessToken = localStorage.getItem(SAFEIT_ACCESS_TOKEN_KEY)
+      || localStorage.getItem(LEGACY_SAFEIT_ACCESS_TOKEN_KEY);
+
+    if (!safeitAccessToken) {
+      setLoginOpen(true);
+      setSbOpen(false);
+      return;
+    }
+
     chat.send(text, files);
     setSbOpen(false);
   };
@@ -114,6 +128,7 @@ export default function Home() {
           onNewChat={handleNewChat}
           onToggleSidebar={() => setSbCollapsed((v) => !v)}
           onOpenMobileSidebar={() => setSbOpen(true)}
+          onOpenLogin={() => setLoginOpen(true)}
         />
 
         <div className="thread" ref={threadRef} onScroll={onThreadScroll}>
@@ -151,6 +166,8 @@ export default function Home() {
         focusId={panel.focusId}
         onClose={closePanel}
       />
+
+      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
     </div>
   );
 }

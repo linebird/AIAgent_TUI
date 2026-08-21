@@ -1,7 +1,12 @@
 "use client";
-import { Pencil, Trash2, Sparkles, Settings } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Pencil, Trash2, Sparkles, Settings, X } from "lucide-react";
 import type { Session } from "@/types";
 import { groupSessions } from "@/lib/utils";
+
+const WORKPLACES_API_URL = "http://localhost:8000/api/saferyn/workplaces";
+const SAFEIT_ACCESS_TOKEN_KEY = "safeit_access_token";
+const LEGACY_SAFEIT_ACCESS_TOKEN_KEY = "safeit-access-token";
 
 interface Props {
   sessions: Session[];
@@ -43,8 +48,238 @@ function Group({ label, items, activeId, onSelect, onDelete }: {
   );
 }
 
+function readStoredName(...keys: string[]) {
+  for (const key of keys) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const name = parsed?.nm ?? parsed?.name ?? parsed?.tenantNm ?? parsed?.bplcNm;
+      if (typeof name === "string" && name.trim()) return name;
+    } catch {
+      if (raw.trim()) return raw;
+    }
+  }
+
+  return "";
+}
+
+function readStoredList(key: string) {
+  const raw = localStorage.getItem(key);
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function readStoredObject(...keys: string[]) {
+  for (const key of keys) {
+    const raw = localStorage.getItem(key);
+    if (!raw) continue;
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>;
+    } catch {
+      return { nm: raw };
+    }
+  }
+
+  return null;
+}
+
+function itemIdentity(item: Record<string, unknown> | null) {
+  if (!item) return "";
+  for (const key of ["id", "tenantId", "tenant_id", "bplcId", "bplc_id", "workspaceId", "value"]) {
+    const value = item[key];
+    if (value != null && value !== "") return String(value);
+  }
+  return JSON.stringify(item);
+}
+
+function optionLabel(item: Record<string, unknown>) {
+  const name = item.nm ?? item.name ?? item.tenantNm ?? item.bplcNm;
+  return typeof name === "string" && name.trim() ? name : "이름 없음";
+}
+
+function ProfileSettingsModal({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved: () => void }) {
+  const [tenants, setTenants] = useState<Record<string, unknown>[]>([]);
+  const [workspaces, setWorkspaces] = useState<Record<string, unknown>[]>([]);
+  const [activeTenantId, setActiveTenantId] = useState("");
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState("");
+  const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+
+    const nextTenants = readStoredList("tenants");
+    const nextWorkspaces = readStoredList("workspaces");
+    const activeTenant = readStoredObject("active_tenant", "active_tanant");
+    const activeWorkspace = readStoredObject("active_workspace", "active_workplace");
+
+    setTenants(nextTenants);
+    setWorkspaces(nextWorkspaces);
+    setActiveTenantId(itemIdentity(activeTenant));
+    setActiveWorkspaceId(itemIdentity(activeWorkspace));
+    setSettingsMessage("");
+  }, [open]);
+
+  if (!open) return null;
+
+  const saveTenant = async (identity: string) => {
+    const selected = tenants.find((item) => itemIdentity(item) === identity);
+    if (!selected) return;
+    localStorage.setItem("active_tenant", JSON.stringify(selected));
+    localStorage.setItem("active_tanant", JSON.stringify(selected));
+    setActiveTenantId(identity);
+    setSettingsMessage("");
+    onSaved();
+
+    const tenantId = itemIdentity(selected);
+    const safeitAccessToken = localStorage.getItem(SAFEIT_ACCESS_TOKEN_KEY)
+      || localStorage.getItem(LEGACY_SAFEIT_ACCESS_TOKEN_KEY)
+      || "";
+
+    setLoadingWorkspaces(true);
+    try {
+      const response = await fetch(WORKPLACES_API_URL, {
+        method: "GET",
+        headers: {
+          "safeit-access-token": safeitAccessToken,
+          "x-tenant-id": tenantId,
+        },
+      });
+      const responseText = await response.text();
+      if (!response.ok) throw new Error(responseText || `HTTP ${response.status}`);
+
+      const payload = responseText ? JSON.parse(responseText) as Record<string, unknown> : {};
+      const nextWorkspaces = Array.isArray(payload.workplaces)
+        ? payload.workplaces.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
+        : [];
+
+      setWorkspaces(nextWorkspaces);
+      localStorage.setItem("workspaces", JSON.stringify(nextWorkspaces));
+
+      const firstWorkspace = nextWorkspaces[0] ?? null;
+      if (firstWorkspace) {
+        localStorage.setItem("active_workspace", JSON.stringify(firstWorkspace));
+        localStorage.setItem("active_workplace", JSON.stringify(firstWorkspace));
+        setActiveWorkspaceId(itemIdentity(firstWorkspace));
+      } else {
+        localStorage.removeItem("active_workspace");
+        localStorage.removeItem("active_workplace");
+        setActiveWorkspaceId("");
+      }
+
+      onSaved();
+    } catch (error) {
+      setSettingsMessage(`사업장 목록을 불러오지 못했습니다. ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setLoadingWorkspaces(false);
+    }
+  };
+
+  const saveWorkspace = (identity: string) => {
+    const selected = workspaces.find((item) => itemIdentity(item) === identity);
+    if (!selected) return;
+    localStorage.setItem("active_workspace", JSON.stringify(selected));
+    localStorage.setItem("active_workplace", JSON.stringify(selected));
+    setActiveWorkspaceId(identity);
+    onSaved();
+  };
+
+  return (
+    <div className="profile-scrim" onMouseDown={onClose}>
+      <section className="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-settings-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="profile-modal-head">
+          <div>
+            <h2 id="profile-settings-title">환경 설정</h2>
+            <p>사용할 테넌트와 사업장을 선택하세요.</p>
+          </div>
+          <button className="icon-btn" type="button" onClick={onClose} title="닫기">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="profile-form">
+          <label>
+            <span>테넌트</span>
+            <select value={activeTenantId} onChange={(event) => { void saveTenant(event.target.value); }}>
+              <option value="" disabled>테넌트 선택</option>
+              {tenants.map((tenant, index) => {
+                const identity = itemIdentity(tenant);
+                return <option key={`${identity}-${index}`} value={identity}>{optionLabel(tenant)}</option>;
+              })}
+            </select>
+          </label>
+
+          <label>
+            <span>사업장</span>
+            <select value={activeWorkspaceId} onChange={(event) => saveWorkspace(event.target.value)} disabled={loadingWorkspaces}>
+              <option value="" disabled>{loadingWorkspaces ? "사업장 불러오는 중..." : "사업장 선택"}</option>
+              {workspaces.map((workspace, index) => {
+                const identity = itemIdentity(workspace);
+                return <option key={`${identity}-${index}`} value={identity}>{optionLabel(workspace)}</option>;
+              })}
+            </select>
+          </label>
+
+          {tenants.length === 0 && workspaces.length === 0 && (
+            <div className="profile-empty">로그인 후 테넌트와 사업장 목록을 확인할 수 있습니다.</div>
+          )}
+          {settingsMessage && <div className="profile-empty">{settingsMessage}</div>}
+
+          <button className="profile-submit" type="button" onClick={onClose}>
+            확인
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function Sidebar({ sessions, activeId, onSelect, onNew, onDelete }: Props) {
   const g = groupSessions(sessions);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profile, setProfile] = useState({
+    tenantName: "테넌트를 선택하세요",
+    workspaceName: "사업장을 선택하세요",
+  });
+
+  useEffect(() => {
+    const loadProfile = () => {
+      setProfile({
+        tenantName: readStoredName("active_tanant", "active_tenant") || "테넌트를 선택하세요",
+        workspaceName: readStoredName("active_workspace", "active_workplace") || "사업장을 선택하세요",
+      });
+    };
+
+    loadProfile();
+    window.addEventListener("storage", loadProfile);
+    window.addEventListener("safeit-profile-change", loadProfile);
+
+    return () => {
+      window.removeEventListener("storage", loadProfile);
+      window.removeEventListener("safeit-profile-change", loadProfile);
+    };
+  }, []);
+
+  const refreshProfile = () => {
+    setProfile({
+      tenantName: readStoredName("active_tanant", "active_tenant") || "테넌트를 선택하세요",
+      workspaceName: readStoredName("active_workspace", "active_workplace") || "사업장을 선택하세요",
+    });
+    window.dispatchEvent(new Event("safeit-profile-change"));
+  };
+
   return (
     <aside className="sidebar">
       <div className="sb-inner">
@@ -80,15 +315,16 @@ export default function Sidebar({ sessions, activeId, onSelect, onNew, onDelete 
           <div className="user-row">
             <div className="avatar">SE</div>
             <div className="user-meta">
-              <div className="un">세이플린 전략마케팅팀 부장</div>
-              <div className="ue">bsu673739@aromit.com</div>
+              <div className="un">{profile.tenantName}</div>
+              <div className="ue">{profile.workspaceName}</div>
             </div>
-            <button className="icon-btn" style={{ width: 32, height: 32 }} title="설정">
+            <button className="icon-btn" style={{ width: 32, height: 32 }} title="설정" onClick={() => setSettingsOpen(true)}>
               <Settings size={17} />
             </button>
           </div>
         </div>
       </div>
+      <ProfileSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} onSaved={refreshProfile} />
     </aside>
   );
 }
