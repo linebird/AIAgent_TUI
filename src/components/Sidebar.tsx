@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { Pencil, Trash2, Sparkles, Settings, X } from "lucide-react";
 import type { Session } from "@/types";
 import { groupSessions } from "@/lib/utils";
-
-const WORKPLACES_API_URL = "http://localhost:8000/api/saferyn/workplaces";
-const SAFEIT_ACCESS_TOKEN_KEY = "safeit_access_token";
-const LEGACY_SAFEIT_ACCESS_TOKEN_KEY = "safeit-access-token";
+import { API_ENDPOINTS } from "@/config/api";
+import { STORAGE_KEYS } from "@/config/storage";
+import { safeitAccessToken } from "@/lib/api-client";
+import { readLocalList, readLocalObject } from "@/lib/storage";
 
 interface Props {
   sessions: Session[];
@@ -65,36 +65,6 @@ function readStoredName(...keys: string[]) {
   return "";
 }
 
-function readStoredList(key: string) {
-  const raw = localStorage.getItem(key);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed)
-      ? parsed.filter((item): item is Record<string, unknown> => !!item && typeof item === "object")
-      : [];
-  } catch {
-    return [];
-  }
-}
-
-function readStoredObject(...keys: string[]) {
-  for (const key of keys) {
-    const raw = localStorage.getItem(key);
-    if (!raw) continue;
-
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>;
-    } catch {
-      return { nm: raw };
-    }
-  }
-
-  return null;
-}
-
 function itemIdentity(item: Record<string, unknown> | null) {
   if (!item) return "";
   for (const key of ["id", "tenantId", "tenant_id", "bplcId", "bplc_id", "workspaceId", "value"]) {
@@ -120,10 +90,10 @@ function ProfileSettingsModal({ open, onClose, onSaved }: { open: boolean; onClo
   useEffect(() => {
     if (!open) return;
 
-    const nextTenants = readStoredList("tenants");
-    const nextWorkspaces = readStoredList("workspaces");
-    const activeTenant = readStoredObject("active_tenant", "active_tanant");
-    const activeWorkspace = readStoredObject("active_workspace", "active_workplace");
+    const nextTenants = readLocalList(STORAGE_KEYS.tenants);
+    const nextWorkspaces = readLocalList(STORAGE_KEYS.workspaces);
+    const activeTenant = readLocalObject(STORAGE_KEYS.activeTenant, STORAGE_KEYS.legacyActiveTenant);
+    const activeWorkspace = readLocalObject(STORAGE_KEYS.activeWorkspace, STORAGE_KEYS.legacyActiveWorkspace);
 
     setTenants(nextTenants);
     setWorkspaces(nextWorkspaces);
@@ -137,23 +107,22 @@ function ProfileSettingsModal({ open, onClose, onSaved }: { open: boolean; onClo
   const saveTenant = async (identity: string) => {
     const selected = tenants.find((item) => itemIdentity(item) === identity);
     if (!selected) return;
-    localStorage.setItem("active_tenant", JSON.stringify(selected));
-    localStorage.setItem("active_tanant", JSON.stringify(selected));
+    localStorage.setItem(STORAGE_KEYS.activeTenant, JSON.stringify(selected));
+    localStorage.setItem(STORAGE_KEYS.legacyActiveTenant, JSON.stringify(selected));
     setActiveTenantId(identity);
     setSettingsMessage("");
     onSaved();
 
     const tenantId = itemIdentity(selected);
-    const safeitAccessToken = localStorage.getItem(SAFEIT_ACCESS_TOKEN_KEY)
-      || localStorage.getItem(LEGACY_SAFEIT_ACCESS_TOKEN_KEY)
-      || "";
+    const token = safeitAccessToken();
 
     setLoadingWorkspaces(true);
     try {
-      const response = await fetch(WORKPLACES_API_URL, {
+      const response = await fetch(API_ENDPOINTS.workplaces, {
         method: "GET",
         headers: {
-          "safeit-access-token": safeitAccessToken,
+          safeit_access_token: token,
+          "safeit-access-token": token,
           "x-tenant-id": tenantId,
         },
       });
@@ -166,16 +135,16 @@ function ProfileSettingsModal({ open, onClose, onSaved }: { open: boolean; onClo
         : [];
 
       setWorkspaces(nextWorkspaces);
-      localStorage.setItem("workspaces", JSON.stringify(nextWorkspaces));
+      localStorage.setItem(STORAGE_KEYS.workspaces, JSON.stringify(nextWorkspaces));
 
       const firstWorkspace = nextWorkspaces[0] ?? null;
       if (firstWorkspace) {
-        localStorage.setItem("active_workspace", JSON.stringify(firstWorkspace));
-        localStorage.setItem("active_workplace", JSON.stringify(firstWorkspace));
+        localStorage.setItem(STORAGE_KEYS.activeWorkspace, JSON.stringify(firstWorkspace));
+        localStorage.setItem(STORAGE_KEYS.legacyActiveWorkspace, JSON.stringify(firstWorkspace));
         setActiveWorkspaceId(itemIdentity(firstWorkspace));
       } else {
-        localStorage.removeItem("active_workspace");
-        localStorage.removeItem("active_workplace");
+        localStorage.removeItem(STORAGE_KEYS.activeWorkspace);
+        localStorage.removeItem(STORAGE_KEYS.legacyActiveWorkspace);
         setActiveWorkspaceId("");
       }
 
@@ -190,8 +159,8 @@ function ProfileSettingsModal({ open, onClose, onSaved }: { open: boolean; onClo
   const saveWorkspace = (identity: string) => {
     const selected = workspaces.find((item) => itemIdentity(item) === identity);
     if (!selected) return;
-    localStorage.setItem("active_workspace", JSON.stringify(selected));
-    localStorage.setItem("active_workplace", JSON.stringify(selected));
+    localStorage.setItem(STORAGE_KEYS.activeWorkspace, JSON.stringify(selected));
+    localStorage.setItem(STORAGE_KEYS.legacyActiveWorkspace, JSON.stringify(selected));
     setActiveWorkspaceId(identity);
     onSaved();
   };
@@ -257,8 +226,8 @@ export default function Sidebar({ sessions, activeId, onSelect, onNew, onDelete 
   useEffect(() => {
     const loadProfile = () => {
       setProfile({
-        tenantName: readStoredName("active_tanant", "active_tenant") || "테넌트를 선택하세요",
-        workspaceName: readStoredName("active_workspace", "active_workplace") || "사업장을 선택하세요",
+        tenantName: readStoredName(STORAGE_KEYS.legacyActiveTenant, STORAGE_KEYS.activeTenant) || "테넌트를 선택하세요",
+        workspaceName: readStoredName(STORAGE_KEYS.activeWorkspace, STORAGE_KEYS.legacyActiveWorkspace) || "사업장을 선택하세요",
       });
     };
 
@@ -274,8 +243,8 @@ export default function Sidebar({ sessions, activeId, onSelect, onNew, onDelete 
 
   const refreshProfile = () => {
     setProfile({
-      tenantName: readStoredName("active_tanant", "active_tenant") || "테넌트를 선택하세요",
-      workspaceName: readStoredName("active_workspace", "active_workplace") || "사업장을 선택하세요",
+      tenantName: readStoredName(STORAGE_KEYS.legacyActiveTenant, STORAGE_KEYS.activeTenant) || "테넌트를 선택하세요",
+      workspaceName: readStoredName(STORAGE_KEYS.activeWorkspace, STORAGE_KEYS.legacyActiveWorkspace) || "사업장을 선택하세요",
     });
     window.dispatchEvent(new Event("safeit-profile-change"));
   };

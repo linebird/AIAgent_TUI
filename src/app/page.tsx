@@ -10,11 +10,9 @@ import SourcePanel from "@/components/SourcePanel";
 import LoginModal from "@/components/LoginModal";
 import { useChat } from "@/hooks/useChat";
 import { useTheme } from "@/hooks/useTheme";
+import { safeitAccessToken } from "@/lib/api-client";
 import type { Source } from "@/types";
 import type { A2UIActionPayload } from "@/lib/a2ui-data";
-
-const SAFEIT_ACCESS_TOKEN_KEY = "safeit_access_token";
-const LEGACY_SAFEIT_ACCESS_TOKEN_KEY = "safeit-access-token";
 
 export default function Home() {
   const chat = useChat();
@@ -89,10 +87,7 @@ export default function Home() {
   };
 
   const handleSend = (text: string, files: { name: string; size: string; icon: string }[]) => {
-    const safeitAccessToken = localStorage.getItem(SAFEIT_ACCESS_TOKEN_KEY)
-      || localStorage.getItem(LEGACY_SAFEIT_ACCESS_TOKEN_KEY);
-
-    if (!safeitAccessToken) {
+    if (!safeitAccessToken()) {
       setLoginOpen(true);
       setSbOpen(false);
       return;

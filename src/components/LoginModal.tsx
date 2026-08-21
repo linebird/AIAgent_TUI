@@ -1,9 +1,8 @@
 "use client";
 import { useCallback, useState } from "react";
 import { X } from "lucide-react";
-
-const LOGIN_URL = "http://localhost:8000/api/saferyn/login";
-const SAFEIT_ACCESS_TOKEN_KEY = "safeit_access_token";
+import { API_ENDPOINTS } from "@/config/api";
+import { STORAGE_KEYS } from "@/config/storage";
 
 interface Props {
   open: boolean;
@@ -48,7 +47,7 @@ export default function LoginModal({ open, onClose }: Props) {
     setMessage("");
 
     try {
-      const response = await fetch(LOGIN_URL, {
+      const response = await fetch(API_ENDPOINTS.login, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -67,25 +66,25 @@ export default function LoginModal({ open, onClose }: Props) {
       }
 
       const token = pickToken(payload);
-      localStorage.setItem(SAFEIT_ACCESS_TOKEN_KEY, token);
+      localStorage.setItem(STORAGE_KEYS.safeitAccessToken, token);
 
       const record = payloadRecord(payload);
       const tenants = record.tenants;
       if (Array.isArray(tenants)) {
-        localStorage.setItem("tenants", JSON.stringify(tenants));
-        localStorage.setItem("active_tenant", JSON.stringify(tenants[0]));
-        localStorage.setItem("active_tanant", JSON.stringify(tenants[0]));
+        localStorage.setItem(STORAGE_KEYS.tenants, JSON.stringify(tenants));
+        localStorage.setItem(STORAGE_KEYS.activeTenant, JSON.stringify(tenants[0]));
+        localStorage.setItem(STORAGE_KEYS.legacyActiveTenant, JSON.stringify(tenants[0]));
       } else {
-        localStorage.removeItem("tenants");
+        localStorage.removeItem(STORAGE_KEYS.tenants);
       }
 
       const workplaces = record.workplaces;
       if (Array.isArray(workplaces)) {
-        localStorage.setItem("workplaces", JSON.stringify(workplaces));
-        localStorage.setItem("active_workplace", JSON.stringify(workplaces[0]));
-        localStorage.setItem("active_workspace", JSON.stringify(workplaces[0]));
+        localStorage.setItem(STORAGE_KEYS.workspaces, JSON.stringify(workplaces));
+        localStorage.setItem(STORAGE_KEYS.legacyActiveWorkspace, JSON.stringify(workplaces[0]));
+        localStorage.setItem(STORAGE_KEYS.activeWorkspace, JSON.stringify(workplaces[0]));
       } else {
-        localStorage.removeItem("workplaces");
+        localStorage.removeItem(STORAGE_KEYS.workspaces);
       }
 
       window.dispatchEvent(new Event("safeit-profile-change"));

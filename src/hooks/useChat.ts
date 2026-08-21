@@ -5,14 +5,11 @@ import { uid, genTitle, sleep } from "@/lib/utils";
 // import { pickAnswer } from "@/lib/data";
 import { a2ApplyEnvelope, a2JsonToEnvelope, a2SetImmutable } from "@/lib/a2ui";
 import { a2uiActionReply, type A2UIActionPayload } from "@/lib/a2ui-data";
+import { API_ENDPOINTS } from "@/config/api";
+import { STORAGE_KEYS } from "@/config/storage";
+import { authHeaders } from "@/lib/api-client";
 
-const LS_KEY = "safetysaas_agent_v1";
-const SAFEIT_ACCESS_TOKEN_KEY = "safeit_access_token";
-const LEGACY_SAFEIT_ACCESS_TOKEN_KEY = "safeit-access-token";
-const CHAT_API_URL = "http://localhost:8000/chat/stream"; // 클라우드 서버에서는 서버의 IP 주소를 사용해야 합니다. (localhost는 안됨. 223.130.159.179) 
-const A2UI_ACTION_API_URL = "http://localhost:8000/a2ui/action";
-// const CHAT_API_URL = "https://saferynchat.mydaas.kr/chat/stream"; // 클라우드 서버에서는 서버의 IP 주소를 사용해야 합니다. (localhost는 안됨. 223.130.159.179) 
-// const A2UI_ACTION_API_URL = "https://saferynchat.mydaas.kr/a2ui/action";
+const LS_KEY = STORAGE_KEYS.chatStore;
 
 type A2UIActionPayloadWithFiles = A2UIActionPayload & { files?: File[] };
 
@@ -79,34 +76,6 @@ function extractTextPayload(payload: unknown): string | null {
   }
 
   return null;
-}
-
-function readLocalObject(...keys: string[]) {
-  for (const key of keys) {
-    const raw = localStorage.getItem(key);
-    if (!raw) continue;
-
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>;
-    } catch {
-      return null;
-    }
-  }
-
-  return null;
-}
-
-function localObjectId(...keys: string[]) {
-  const item = readLocalObject(...keys);
-  if (!item) return "";
-
-  for (const key of ["id", "tenantId", "tenant_id", "bplcId", "bplc_id", "workspaceId", "value"]) {
-    const value = item[key];
-    if (value != null && value !== "") return String(value);
-  }
-
-  return "";
 }
 
 function loadState(): Store {
@@ -177,25 +146,11 @@ export function useChat() {
     try {
       patchMsg(botId, { phase: "status", statusText: "요청을 처리하고 있어요…" });
 
-      const safeitAccessToken = localStorage.getItem(SAFEIT_ACCESS_TOKEN_KEY)
-        || localStorage.getItem(LEGACY_SAFEIT_ACCESS_TOKEN_KEY)
-        || "";
-      const tenantId = localObjectId("active_tenant", "active_tanant");
-      const workspaceId = localObjectId("active_workspace", "active_workplace");
-
-      const res = await fetch(CHAT_API_URL, {
+      const res = await fetch(API_ENDPOINTS.chatStream, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(safeitAccessToken ? {
-            safeit_access_token: safeitAccessToken,
-            "safeit-access-token": safeitAccessToken,
-          } : {}),
-          ...(tenantId ? {
-            "x-tanant-id": tenantId,
-            "x-tenant-id": tenantId,
-          } : {}),
-          ...(workspaceId ? { "x-bplc-id": workspaceId } : {}),
+          ...authHeaders(),
         },
         body: JSON.stringify({
           session_id: sessionId,
@@ -408,8 +363,9 @@ export function useChat() {
         formData.append("action", JSON.stringify(serializableAction));
         files.forEach((file) => formData.append("files", file, file.name));
 
-        const res = await fetch(A2UI_ACTION_API_URL, {
+        const res = await fetch(API_ENDPOINTS.a2uiAction, {
           method: "POST",
+          headers: authHeaders(),
           body: formData,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
