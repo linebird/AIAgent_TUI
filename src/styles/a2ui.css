@@ -873,6 +873,18 @@
   border-radius: inherit;
   background: #d30707;
 }
+.a2ui-actv-item-bar.bad span {
+  background: #d30707;
+}
+.a2ui-actv-item-bar.caution span {
+  background: #f5ad00;
+}
+.a2ui-actv-item-bar.good span {
+  background: #3fc56a;
+}
+.a2ui-actv-item-bar.etc span {
+  background: #677286;
+}
 .a2ui-actv-item-foot {
   display: flex;
   align-items: baseline;

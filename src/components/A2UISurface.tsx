@@ -447,7 +447,7 @@ function A2UIActvScoreSummaryCard({ comp, scopeBase, ctx }: { comp: A2UIComponen
                     </div>
                     <em className={`a2ui-actv-badge ${itemGradeTone}`}>{itemGradeName}</em>
                   </div>
-                  <div className="a2ui-actv-item-bar" aria-hidden="true">
+                  <div className={`a2ui-actv-item-bar ${itemGradeTone}`} aria-hidden="true">
                     <span style={{ width: `${progress}%` }} />
                   </div>
                   <div className="a2ui-actv-item-foot">
