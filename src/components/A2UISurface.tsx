@@ -357,19 +357,35 @@ function A2UIActvScoreSummaryCard({ comp, scopeBase, ctx }: { comp: A2UIComponen
   const gradeTone = a2ToStr(value?.gradeTone ?? "etc");
   const previousLabel = a2ToStr(value?.previousLabel ?? "상반기 대비 +0점");
   const siteName = a2ToStr(value?.siteName ?? "-");
+  const tenantName = a2ToStr(value?.tenantName ?? "");
+  const periodLabel = a2ToStr(value?.periodLabel ?? "");
+  const collectedAt = a2ToStr(value?.collectedAt ?? "");
+  const insight = a2ToStr(value?.insight ?? "");
   const averageScore = Number(value?.averageScore ?? 0) || 0;
   const averageDeltaText = a2ToStr(value?.averageDeltaText ?? "+0점");
   const gradeCounts = Array.isArray(value?.gradeCounts)
     ? (value.gradeCounts as Record<string, unknown>[])
     : [];
+  const scoreItems = Array.isArray(value?.scoreItems)
+    ? (value.scoreItems as Record<string, unknown>[])
+    : [];
   const deltaTone = averageDeltaText.trim().startsWith("-") ? "bad" : "good";
+  const averageLabel = tenantName ? `${tenantName} 테넌트 평균` : `<${siteName}> 전체 사업장 평균`;
 
   return (
     <div className="a2ui-actv-card">
       <section className="a2ui-actv-score">
         <div className="a2ui-actv-title">{title}</div>
+        <div className="a2ui-actv-meta">
+          <strong>{siteName}</strong>
+          {(tenantName || periodLabel || collectedAt) && (
+            <span>
+              {[tenantName, periodLabel, collectedAt].filter(Boolean).join(" · ")}
+            </span>
+          )}
+        </div>
         <div className="a2ui-actv-main">
-          <strong>{score}</strong>
+          <strong className={gradeTone}>{score}</strong>
           <span>/ {maxScore}점</span>
           <em className={`a2ui-actv-badge ${gradeTone}`}>{gradeName}</em>
         </div>
@@ -379,10 +395,11 @@ function A2UIActvScoreSummaryCard({ comp, scopeBase, ctx }: { comp: A2UIComponen
         </div>
         <div className="a2ui-actv-average">
           <span className="a2ui-actv-people">{ICONS.activity}</span>
-          <span>&lt;{siteName}&gt; 전체 사업장 평균</span>
+          <span>{averageLabel}</span>
           <strong>{averageScore}점 대비</strong>
           <b className={deltaTone}>{averageDeltaText}</b>
         </div>
+        {insight && <p className="a2ui-actv-insight">{insight}</p>}
       </section>
       <section className="a2ui-actv-counts">
         <div className="a2ui-actv-title">평가 별 개수</div>
@@ -404,6 +421,45 @@ function A2UIActvScoreSummaryCard({ comp, scopeBase, ctx }: { comp: A2UIComponen
           })}
         </div>
       </section>
+      {scoreItems.length > 0 && (
+        <section className="a2ui-actv-items">
+          <div className="a2ui-actv-title">안전활동 항목별 점수</div>
+          <div className="a2ui-actv-item-list">
+            {scoreItems.map((item, index) => {
+              const name = a2ToStr(item.name ?? "-");
+              const itemScore = Number(item.score ?? 0) || 0;
+              const percent = Number(item.percent ?? 0) || 0;
+              const caseCount = Number(item.caseCount ?? 0) || 0;
+              const unitName = a2ToStr(item.unitName ?? "점");
+              const unitDescription = a2ToStr(item.unitDescription ?? "");
+              const itemGradeName = a2ToStr(item.gradeName ?? "-");
+              const itemGradeTone = a2ToStr(item.gradeTone ?? "etc");
+              const latestScoreDate = a2ToStr(item.latestScoreDate ?? "");
+              const recommendedCycle = a2ToStr(item.recommendedCycle ?? "");
+              const progress = Math.max(0, Math.min(100, itemScore || percent));
+
+              return (
+                <div key={`${name}-${index}`} className="a2ui-actv-item">
+                  <div className="a2ui-actv-item-head">
+                    <div>
+                      <strong>{name}</strong>
+                      <span>{[unitDescription, latestScoreDate && `최종 ${latestScoreDate}`, recommendedCycle && `권장 ${recommendedCycle}`].filter(Boolean).join(" · ")}</span>
+                    </div>
+                    <em className={`a2ui-actv-badge ${itemGradeTone}`}>{itemGradeName}</em>
+                  </div>
+                  <div className="a2ui-actv-item-bar" aria-hidden="true">
+                    <span style={{ width: `${progress}%` }} />
+                  </div>
+                  <div className="a2ui-actv-item-foot">
+                    <b>{itemScore}{unitName}</b>
+                    <span>이행률 {percent}% · 누적 {caseCount}건</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
@@ -616,13 +672,16 @@ function A2UIOpertPlanStatusCard({ comp, scopeBase, ctx }: { comp: A2UIComponent
     { label: "작업 승인", count: Number(value?.approvalCount ?? 0) || 0, color: "#F5B400" },
     { label: "작업 완료", count: completedCount, color: "#08B86F" },
   ];
-  const formats = Array.isArray(value?.formats)
+  const rawFormats = Array.isArray(value?.formats)
     ? (value.formats as Record<string, unknown>[]).map((item, index) => ({
-        label: a2ToStr(item.label ?? `구분 ${index + 1}`),
-        count: Number(item.count ?? 0) || 0,
+        label: a2ToStr(item.label ?? item.typeNm ?? item.name ?? `구분 ${index + 1}`),
+        count: Number(item.count ?? item.cnt ?? item.typeCnt ?? item.value ?? item.comptCnt ?? item.completedCnt ?? item.totCnt ?? 0) || 0,
         color: ["#7B74F2", "#7AB6F0", "#08B86F", "#F5B400", "#F97316"][index % 5],
       }))
     : [];
+  const formats = completedCount > 0 && rawFormats.reduce((sum, item) => sum + item.count, 0) === 0
+    ? [{ label: "작업 완료", count: completedCount, color: "#08B86F" }]
+    : rawFormats;
   const formatTotal = formats.reduce((sum, item) => sum + item.count, 0);
   let running = 0;
   const segments = formats

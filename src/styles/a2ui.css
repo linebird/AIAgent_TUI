@@ -621,6 +621,26 @@
   line-height: 1.2;
   letter-spacing: 0;
 }
+.a2ui-actv-meta {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  min-width: 0;
+}
+.a2ui-actv-meta strong {
+  min-width: 0;
+  color: oklch(0.2 0.014 260);
+  font-size: 15px;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.a2ui-actv-meta span {
+  color: oklch(0.49 0.014 260);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
 .a2ui-actv-main {
   display: flex;
   align-items: center;
@@ -633,6 +653,18 @@
   font-size: 60px;
   font-weight: 850;
   line-height: 0.92;
+}
+.a2ui-actv-main strong.bad {
+  color: #d30707;
+}
+.a2ui-actv-main strong.caution {
+  color: #f5ad00;
+}
+.a2ui-actv-main strong.good {
+  color: #3fc56a;
+}
+.a2ui-actv-main strong.etc {
+  color: #677286;
 }
 .a2ui-actv-main span {
   color: oklch(0.42 0.014 260);
@@ -723,6 +755,16 @@
 .a2ui-actv-average b.good {
   color: #18864a;
 }
+.a2ui-actv-insight {
+  margin: 18px 0 0;
+  padding: 12px 13px;
+  border-radius: 8px;
+  background: #fff;
+  color: oklch(0.32 0.015 260);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.55;
+}
 .a2ui-actv-count-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -769,20 +811,114 @@
   font-size: 18px;
   font-weight: 850;
 }
+.a2ui-actv-items {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.a2ui-actv-item-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 2px;
+}
+.a2ui-actv-item {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid oklch(0.87 0.004 260);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 1px oklch(0.2 0.01 260 / 0.03);
+}
+.a2ui-actv-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.a2ui-actv-item-head div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.a2ui-actv-item-head strong {
+  color: oklch(0.2 0.014 260);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+.a2ui-actv-item-head span {
+  color: oklch(0.49 0.014 260);
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.a2ui-actv-item-head .a2ui-actv-badge {
+  flex: 0 0 auto;
+  height: 24px;
+  font-size: 12px;
+}
+.a2ui-actv-item-bar {
+  height: 8px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: oklch(0.91 0.006 260);
+}
+.a2ui-actv-item-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #d30707;
+}
+.a2ui-actv-item-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.a2ui-actv-item-foot b {
+  color: oklch(0.2 0.014 260);
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.a2ui-actv-item-foot span {
+  color: oklch(0.49 0.014 260);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
 
 [data-theme="dark"] .a2ui-actv-card {
   background: oklch(0.27 0.01 260);
   color: var(--text);
 }
 [data-theme="dark"] .a2ui-actv-title,
+[data-theme="dark"] .a2ui-actv-meta strong,
 [data-theme="dark"] .a2ui-actv-main span,
 [data-theme="dark"] .a2ui-actv-prev,
 [data-theme="dark"] .a2ui-actv-average {
   color: var(--text);
 }
-[data-theme="dark"] .a2ui-actv-count-box {
+[data-theme="dark"] .a2ui-actv-meta span,
+[data-theme="dark"] .a2ui-actv-item-head span,
+[data-theme="dark"] .a2ui-actv-item-foot span {
+  color: var(--text-muted);
+}
+[data-theme="dark"] .a2ui-actv-insight,
+[data-theme="dark"] .a2ui-actv-count-box,
+[data-theme="dark"] .a2ui-actv-item {
   background: var(--surface);
   border-color: var(--border-strong);
+}
+[data-theme="dark"] .a2ui-actv-item-head strong,
+[data-theme="dark"] .a2ui-actv-item-foot b {
+  color: var(--text);
 }
 
 @media (max-width: 760px) {
@@ -802,6 +938,20 @@
   }
   .a2ui-actv-count-grid {
     grid-template-columns: repeat(2, minmax(96px, 1fr));
+  }
+  .a2ui-actv-item-list {
+    grid-template-columns: 1fr;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+  .a2ui-actv-item-foot {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .a2ui-actv-item-foot span {
+    white-space: normal;
   }
 }
 
