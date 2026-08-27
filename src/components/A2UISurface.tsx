@@ -244,6 +244,12 @@ function A2UIWeeklyScheduleCard({ comp, scopeBase, ctx }: { comp: A2UIComponent;
   const activeTab = a2ToStr(value?.activeTab ?? "사업장");
   const tabs = Array.isArray(value?.tabs) ? value.tabs.map((tab) => a2ToStr(tab)) : ["사업장", "개인"];
   const days = Array.isArray(value?.days) ? (value.days as Record<string, unknown>[]) : [];
+  const now = new Date();
+  const todayKey = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
 
   return (
     <div className="a2ui-week-card">
@@ -271,11 +277,12 @@ function A2UIWeeklyScheduleCard({ comp, scopeBase, ctx }: { comp: A2UIComponent;
             const dayText = a2ToStr(day.day ?? "");
             const dateText = a2ToStr(day.date ?? "");
             const items = Array.isArray(day.items) ? (day.items as Record<string, unknown>[]) : [];
+            const isToday = dateText === todayKey;
             const cls = [
               "a2ui-week-day",
               day.isSaturday ? "sat" : "",
               day.isSunday ? "sun" : "",
-              day.isToday ? "today" : "",
+              isToday ? "today" : "",
             ].filter(Boolean).join(" ");
 
             return (
