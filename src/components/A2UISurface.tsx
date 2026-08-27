@@ -242,7 +242,8 @@ function A2UIWeeklyScheduleCard({ comp, scopeBase, ctx }: { comp: A2UIComponent;
   const title = a2ToStr(value?.title ?? comp.title ?? "주간 일정");
   const monthLabel = a2ToStr(value?.monthLabel ?? "");
   const activeTab = a2ToStr(value?.activeTab ?? "사업장");
-  const tabs = Array.isArray(value?.tabs) ? value.tabs.map((tab) => a2ToStr(tab)) : ["사업장", "개인"];
+  // const tabs = Array.isArray(value?.tabs) ? value.tabs.map((tab) => a2ToStr(tab)) : ["사업장", "개인"];
+  const tabs = Array.isArray(value?.tabs) ? value.tabs.map((tab) => a2ToStr(tab)) : ["사업장"];
   const days = Array.isArray(value?.days) ? (value.days as Record<string, unknown>[]) : [];
   const now = new Date();
   const todayKey = [
@@ -256,22 +257,10 @@ function A2UIWeeklyScheduleCard({ comp, scopeBase, ctx }: { comp: A2UIComponent;
       <div className="a2ui-week-title">{title}</div>
       <div className="a2ui-week-head">
         <div className="a2ui-week-month">{monthLabel}</div>
-        <div className="a2ui-week-tabs" role="tablist" aria-label="일정 범위">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              className={tab === activeTab ? "on" : ""}
-              role="tab"
-              aria-selected={tab === activeTab}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+
       </div>
       <div className="a2ui-week-body">
-        <button type="button" className="a2ui-week-nav" aria-label="이전 주">{ICONS.chevron}</button>
+        <button type="button" className="a2ui-week-nav" aria-label="이전 주"></button>
         <div className="a2ui-week-grid">
           {days.map((day, index) => {
             const dayText = a2ToStr(day.day ?? "");
