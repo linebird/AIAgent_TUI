@@ -2,6 +2,7 @@ export const STORAGE_KEYS = {
   chatStore: "safetysaas_agent_v1",
   safeitAccessToken: "safeit_access_token",
   legacySafeitAccessToken: "safeit-access-token",
+  refreshToken: "refresh_token",
   tenants: "tenants",
   workspaces: "workspaces",
   activeTenant: "active_tenant",

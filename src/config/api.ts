@@ -5,5 +5,6 @@ export const API_ENDPOINTS = {
   chatStream: `${API_BASE_URL}/chat/stream`,
   a2uiAction: `${API_BASE_URL}/a2ui/action`,
   login: `${API_BASE_URL}/api/saferyn/login`,
+  refreshToken: `${API_BASE_URL}/api/saferyn/refresh-token`,
   workplaces: `${API_BASE_URL}/api/saferyn/workplaces`,
 };

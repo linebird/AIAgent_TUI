@@ -5,7 +5,7 @@ import type { Session } from "@/types";
 import { groupSessions } from "@/lib/utils";
 import { API_ENDPOINTS } from "@/config/api";
 import { STORAGE_KEYS } from "@/config/storage";
-import { safeitAccessToken } from "@/lib/api-client";
+import { authFetch } from "@/lib/api-client";
 import { readLocalList, readLocalObject } from "@/lib/storage";
 
 interface Props {
@@ -114,15 +114,11 @@ function ProfileSettingsModal({ open, onClose, onSaved }: { open: boolean; onClo
     onSaved();
 
     const tenantId = itemIdentity(selected);
-    const token = safeitAccessToken();
-
     setLoadingWorkspaces(true);
     try {
-      const response = await fetch(API_ENDPOINTS.workplaces, {
+      const response = await authFetch(API_ENDPOINTS.workplaces, {
         method: "GET",
         headers: {
-          safeit_access_token: token,
-          "safeit-access-token": token,
           "x-tenant-id": tenantId,
         },
       });

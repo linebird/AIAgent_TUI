@@ -241,9 +241,6 @@ function A2UIWeeklyScheduleCard({ comp, scopeBase, ctx }: { comp: A2UIComponent;
   const value = a2Resolve((comp as any).value, ctx.model, scopeBase) as Record<string, unknown> | null;
   const title = a2ToStr(value?.title ?? comp.title ?? "주간 일정");
   const monthLabel = a2ToStr(value?.monthLabel ?? "");
-  const activeTab = a2ToStr(value?.activeTab ?? "사업장");
-  // const tabs = Array.isArray(value?.tabs) ? value.tabs.map((tab) => a2ToStr(tab)) : ["사업장", "개인"];
-  const tabs = Array.isArray(value?.tabs) ? value.tabs.map((tab) => a2ToStr(tab)) : ["사업장"];
   const days = Array.isArray(value?.days) ? (value.days as Record<string, unknown>[]) : [];
   const now = new Date();
   const todayKey = [

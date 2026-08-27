@@ -7,7 +7,7 @@ import { a2ApplyEnvelope, a2JsonToEnvelope, a2SetImmutable } from "@/lib/a2ui";
 import { a2uiActionReply, type A2UIActionPayload } from "@/lib/a2ui-data";
 import { API_ENDPOINTS } from "@/config/api";
 import { STORAGE_KEYS } from "@/config/storage";
-import { authHeaders } from "@/lib/api-client";
+import { authFetch } from "@/lib/api-client";
 
 const LS_KEY = STORAGE_KEYS.chatStore;
 
@@ -146,11 +146,10 @@ export function useChat() {
     try {
       patchMsg(botId, { phase: "status", statusText: "요청을 처리하고 있어요…" });
 
-      const res = await fetch(API_ENDPOINTS.chatStream, {
+      const res = await authFetch(API_ENDPOINTS.chatStream, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...authHeaders(),
         },
         body: JSON.stringify({
           session_id: sessionId,
@@ -363,9 +362,8 @@ export function useChat() {
         formData.append("action", JSON.stringify(serializableAction));
         files.forEach((file) => formData.append("files", file, file.name));
 
-        const res = await fetch(API_ENDPOINTS.a2uiAction, {
+        const res = await authFetch(API_ENDPOINTS.a2uiAction, {
           method: "POST",
-          headers: authHeaders(),
           body: formData,
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
