@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   legacySafeitAccessToken: "safeit-access-token",
   refreshToken: "refresh_token",
   tenants: "tenants",
+  userInfo: "user_info",
   workspaces: "workspaces",
   activeTenant: "active_tenant",
   legacyActiveTenant: "active_tanant",

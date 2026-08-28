@@ -71,6 +71,10 @@ export default function LoginModal({ open, onClose }: Props) {
       localStorage.setItem(STORAGE_KEYS.refreshToken, refreshToken);
 
       const record = payloadRecord(payload);
+      const user = record.user_info;
+      localStorage.setItem(STORAGE_KEYS.userInfo, JSON.stringify(user ?? {}));
+
+
       const tenants = record.tenants;
       if (Array.isArray(tenants)) {
         localStorage.setItem(STORAGE_KEYS.tenants, JSON.stringify(tenants));

@@ -3,13 +3,14 @@
  * A2UI v0.9 — React renderer
  * Ported from design_handoff_safetysaas/app/a2ui.jsx
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { A2UISurfaceState, A2UIComponent } from "@/types";
 import {
   a2Get, a2AbsPath, a2Resolve, a2RunChecks, a2ToStr, a2Interpolate,
   A2UI_ICON_MAP,
 } from "@/lib/a2ui";
 import type { A2UIActionPayload } from "@/lib/a2ui-data";
+import { STORAGE_KEYS } from "@/config/storage";
 import { marked } from "marked";
 
 // ---- Inline icon set (lucide-style SVGs) -----------------------
@@ -57,6 +58,19 @@ function surfaceFiles(surfaceId: string): File[] {
   return Array.from(A2UI_FILE_STORE.entries())
     .filter(([key]) => key.startsWith(prefix))
     .flatMap(([, files]) => files);
+}
+
+function storedUserName() {
+  if (typeof window === "undefined") return "";
+
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.userInfo);
+    if (!raw) return "";
+    const user = JSON.parse(raw) as Record<string, unknown>;
+    return typeof user.nm === "string" ? user.nm.trim() : "";
+  } catch {
+    return "";
+  }
 }
 
 // ---- Text with markdown inline rendering -----------------------
@@ -1345,12 +1359,27 @@ interface Props {
 }
 
 export default function A2UISurface({ surface, msgId, onData, onAction }: Props) {
-  if (!surface || surface.deleted) return null;
-
   const model = surface.dataModel as Record<string, unknown>;
   const hasRoot = surface.components && surface.components.root;
   const primary = surface.theme?.primaryColor;
   const styleVars = primary ? ({ "--a2ui-primary": primary } as React.CSSProperties) : undefined;
+
+  useEffect(() => {
+    if (!surface || surface.deleted || surface.surfaceId !== "safety-report-form") return;
+
+    const report = model.report;
+    const registrant = report && typeof report === "object"
+      ? a2ToStr((report as Record<string, unknown>).registrant ?? "").trim()
+      : "";
+    if (registrant && registrant !== "테스터") return;
+
+    const name = storedUserName();
+    if (!name) return;
+
+    onData(msgId, "/report/registrant", name);
+  }, [model.report, msgId, onData, surface]);
+
+  if (!surface || surface.deleted) return null;
 
   const ctx: A2UICtx = {
     surface,
