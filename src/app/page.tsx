@@ -11,7 +11,7 @@ import LoginModal from "@/components/LoginModal";
 import { useChat } from "@/hooks/useChat";
 import { useTheme } from "@/hooks/useTheme";
 import { safeitAccessToken } from "@/lib/api-client";
-import { cancelSpeech, isTtsEnabled, setTtsEnabled } from "@/lib/tts";
+import { cancelSpeech, isTtsEnabled, primeSpeech, setTtsEnabled } from "@/lib/tts";
 import type { Source } from "@/types";
 import type { A2UIActionPayload } from "@/lib/a2ui-data";
 
@@ -87,12 +87,14 @@ export default function Home() {
   };
 
   const handleToggleTts = () => {
-    setTtsOn((enabled) => {
-      const next = !enabled;
-      setTtsEnabled(next);
-      if (!next) cancelSpeech();
-      return next;
-    });
+    const next = !ttsOn;
+    setTtsEnabled(next);
+    if (next) {
+      primeSpeech();
+    } else {
+      cancelSpeech();
+    }
+    setTtsOn(next);
   };
 
   const handleSelect = (id: string) => {
