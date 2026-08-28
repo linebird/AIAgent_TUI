@@ -9,4 +9,5 @@ export const STORAGE_KEYS = {
   legacyActiveTenant: "active_tanant",
   activeWorkspace: "active_workspace",
   legacyActiveWorkspace: "active_workplace",
+  ttsEnabled: "tts_enabled",
 };

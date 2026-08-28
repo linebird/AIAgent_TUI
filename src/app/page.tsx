@@ -11,6 +11,7 @@ import LoginModal from "@/components/LoginModal";
 import { useChat } from "@/hooks/useChat";
 import { useTheme } from "@/hooks/useTheme";
 import { safeitAccessToken } from "@/lib/api-client";
+import { cancelSpeech, isTtsEnabled, setTtsEnabled } from "@/lib/tts";
 import type { Source } from "@/types";
 import type { A2UIActionPayload } from "@/lib/a2ui-data";
 
@@ -22,6 +23,7 @@ export default function Home() {
   const [sbCollapsed, setSbCollapsed] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  const [ttsOn, setTtsOn] = useState(false);
   const [panel, setPanel] = useState<{ open: boolean; sources: Source[] | null; focusId: number | null }>({
     open: false, sources: null, focusId: null,
   });
@@ -46,6 +48,10 @@ export default function Home() {
   useEffect(() => {
     if (chat.autoStick.current) scrollToBottom();
   }, [chat.messages, scrollToBottom, chat.autoStick]);
+
+  useEffect(() => {
+    setTtsOn(isTtsEnabled());
+  }, []);
 
   const onThreadScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -78,6 +84,15 @@ export default function Home() {
     chat.newChat();
     setSbOpen(false);
     closePanel();
+  };
+
+  const handleToggleTts = () => {
+    setTtsOn((enabled) => {
+      const next = !enabled;
+      setTtsEnabled(next);
+      if (!next) cancelSpeech();
+      return next;
+    });
   };
 
   const handleSelect = (id: string) => {
@@ -124,6 +139,8 @@ export default function Home() {
           onToggleSidebar={() => setSbCollapsed((v) => !v)}
           onOpenMobileSidebar={() => setSbOpen(true)}
           onOpenLogin={() => setLoginOpen(true)}
+          ttsEnabled={ttsOn}
+          onToggleTts={handleToggleTts}
         />
 
         <div className="thread" ref={threadRef} onScroll={onThreadScroll}>
